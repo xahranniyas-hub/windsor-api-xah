@@ -2,6 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import cors from "cors";
+import job from "./config/cron.js";
 
 // Import routes
 import authRoutes from "./routes/authRoutes.js";
@@ -14,6 +15,7 @@ dotenv.config();
 
 const port = process.env.PORT;
 
+job.start();
 app.use(cors());
 
 // Connect to MongoDB
