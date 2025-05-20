@@ -9,6 +9,9 @@ import {
   addAdvancePayment,
   receivePayment,
   deleteBooking,
+  refundDeposit,
+  deletePayment,
+  updatePayment,
 } from "../controllers/bookingController.js";
 import { protect, authorizeRole } from "../middleware/authMiddleware.js";
 
@@ -88,5 +91,14 @@ router.delete(
   authorizeRole(["editor", "admin"]),
   deleteBooking
 );
+
+// Refund deposit back to customer
+router.post("/:id/refund-deposit", refundDeposit);
+
+///api/bookings/:id/payments/:serial
+router.delete("/:id/payments/:serial", deletePayment);
+
+// edit payment
+router.patch("/:id/payments/:serial", updatePayment);
 
 export default router;

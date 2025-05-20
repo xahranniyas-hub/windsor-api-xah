@@ -6,6 +6,36 @@ import { getNextSequenceValue } from "../utils/getNextSequenceValue.js";
 const calcTotalAdvance = (adv = []) =>
   adv.reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
+const calcSum = (arr = []) =>
+  arr.reduce((s, p) => s + Number(p.amount || 0), 0);
+
+/**
+ * (re)computes: balanceDue ‖ refundDueToCustomer ‖ finalInvoice.status
+ * call this after you push / splice any payment rows.
+ */
+function recomputeFinancials(booking) {
+  const invoiceTotal = booking.finalInvoice?.total ?? 0;
+
+  /* ▶ payments that affect the invoice ◀ */
+  const paymentsTotal = calcSum(booking.advancePayments); // AP + PY + deposit-as-PY
+
+  /* ▶ refundable-deposit pool ◀           (positive rows = collected) */
+  const depositSum = calcSum(booking.refundableDepositPayments); // negative rows reduce pool
+
+  booking.balanceDue = invoiceTotal - paymentsTotal; // deposit already in payments
+  if (booking.balanceDue < 0) booking.balanceDue = 0; // never show negative due
+
+  booking.refundDueToCustomer = Math.max(0, depositSum); // leftover deposit
+
+  // If the pool is negative you already *over-refunded*. Flag it visibly.
+  if (depositSum < 0)
+    console.warn(`Booking ${booking.serialNumber} has a negative deposit pool`);
+
+  if (booking.finalInvoice) {
+    booking.finalInvoice.status = booking.balanceDue === 0 ? "Settled" : "Open";
+  }
+}
+
 /* ─────────────────────────────────────────  READS ── */
 export const getAllBookings = async (req, res) => {
   try {
@@ -54,7 +84,7 @@ export const addAdvancePayment = async (req, res) => {
       amount,
     });
 
-    booking.balanceDue -= amount;
+    recomputeFinancials(booking);
     await booking.save();
 
     return res.json(booking);
@@ -63,29 +93,57 @@ export const addAdvancePayment = async (req, res) => {
   }
 };
 
+//Receive payment
 export const receivePayment = async (req, res) => {
   try {
     const { id } = req.params;
-    const { date, reference, description, mode, amount } = req.body;
+    const { depositApplied = 0, payment = null } = req.body;
 
     const booking = await Booking.findById(id);
-    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    if (!booking) throw new Error("Booking not found");
 
-    const seq = await getNextSequenceValue("advancePayments");
-    const serialNumber = `PY${String(seq).padStart(6, "0")}`;
+    /* ───  A.  move deposit → a PY row  ─────────────────────── */
+    if (depositApplied > 0) {
+      const seq = await getNextSequenceValue("advancePayments");
 
-    booking.advancePayments.push({
-      date,
-      serialNumber,
-      reference,
-      description,
-      mode,
-      amount,
-    });
+      /* positive payment entry (will appear in the invoice’s payment list) */
+      booking.advancePayments.push({
+        date: new Date(),
+        serialNumber: `PY${String(seq).padStart(6, "0")}`,
+        reference: "deposit-used",
+        description: "Refundable deposit applied against invoice",
+        mode: "deposit", // ← NEW enum value already added
+        amount: depositApplied,
+      });
 
-    booking.balanceDue -= amount;
+      /* matching *negative* row to reduce the pool that is still refundable */
+      booking.refundableDepositPayments.push({
+        date: new Date(),
+        serialNumber: `DP${String(seq).padStart(6, "0")}`,
+        reference: "deposit-used",
+        description: "Deposit applied to invoice",
+        mode: "deposit",
+        amount: -depositApplied,
+      });
+    }
+
+    /* ───  B.  ordinary extra payment (still optional) ──────── */
+    if (payment && payment.amount > 0) {
+      const seq = await getNextSequenceValue("advancePayments");
+      booking.advancePayments.push({
+        date: payment.date,
+        serialNumber: `PY${String(seq).padStart(6, "0")}`,
+        reference: payment.reference,
+        description: payment.description || "Invoice payment",
+        mode: payment.mode,
+        amount: payment.amount,
+      });
+    }
+
+    /* ───  C.  recompute financials  ────────────────────────── */
+    recomputeFinancials(booking);
+
     await booking.save();
-
     return res.json(booking);
   } catch (err) {
     return res.status(400).json({ message: err.message });
@@ -114,8 +172,7 @@ export const updateBooking = async (req, res) => {
     }
 
     /* Re-calculate balance due */
-    booking.balanceDue =
-      booking.indicativePricing - calcTotalAdvance(booking.advancePayments);
+    recomputeFinancials(booking);
 
     await booking.save();
     return res.json(booking);
@@ -124,48 +181,68 @@ export const updateBooking = async (req, res) => {
   }
 };
 
-/* ─────────────────────────────────────────  FINAL INVOICE ── */
+/* ------------------------------------------------------------------ */
+/*  FINAL INVOICE – create / update                                   */
+/* ------------------------------------------------------------------ */
 export const generateFinalInvoice = async (req, res) => {
   try {
     const { id } = req.params;
-    let { invoiceNumber, additionalIncome } = req.body;
+    let { invoiceNumber, additionalIncome = [] } = req.body;
 
+    /* ---------- fetch booking ---------- */
     const booking = await Booking.findById(id);
     if (!booking) return res.status(404).json({ message: "Booking not found" });
 
+    /* ---------- invoice # if missing ---------- */
     if (!invoiceNumber) {
       const seq = await getNextSequenceValue("invoices");
-      invoiceNumber = `IN${String(seq).padStart(6, "0")}`;
+      invoiceNumber = `IN${seq.toString().padStart(6, "0")}`;
     }
 
-    const addIncomeTotal = (additionalIncome || []).reduce(
-      (sum, item) => sum + Number(item.amount || 0),
+    /* ---------- normalise line-items ---------- */
+    additionalIncome = additionalIncome.map((row) => {
+      const cost = Number(row.cost) || 0;
+      const quantity = Number(row.quantity) || 0;
+
+      return {
+        type: row.type || "",
+        description: row.description || "",
+        cost,
+        quantity,
+        amount: row.amount !== undefined ? Number(row.amount) : cost * quantity,
+      };
+    });
+
+    /* ---------- totals ---------- */
+    const addIncomeTotal = additionalIncome.reduce(
+      (sum, r) => sum + r.amount,
       0
     );
 
     const subtotal = Number(booking.indicativePricing) + addIncomeTotal;
-    const vat = 0; // change if needed
+    const vat = 0; // change if you need VAT later
     const total = subtotal + vat;
 
-    const totalAdvance = calcTotalAdvance(booking.advancePayments);
-    const balanceDue = total - totalAdvance;
-
+    /* ─────────────────────────────────────────────────────── */
+    /*  write invoice object BEFORE recomputing financials     */
     booking.finalInvoice = {
       invoiceNumber,
       dateIssued: new Date(),
-      lineItems: additionalIncome || [],
+      lineItems: additionalIncome,
       subtotal,
       vat,
       total,
-      balanceDue,
     };
+    /* ─────────────────────────────────────────────────────── */
 
-    booking.balanceDue = balanceDue;
-    booking.status = "completed";
+    booking.status = "completed"; // booking is now done
+    recomputeFinancials(booking); // sets balanceDue & invoice.status
 
     await booking.save();
+
     return res.json({ message: "Final invoice updated", booking });
   } catch (err) {
+    console.error(err);
     return res.status(400).json({ message: err.message });
   }
 };
@@ -199,6 +276,240 @@ export const deleteBooking = async (req, res) => {
 
     await booking.deleteOne();
     return res.json({ message: "Booking deleted successfully" });
+  } catch (err) {
+    return res.status(400).json({ message: err.message });
+  }
+};
+
+// Refund back to customer
+export const refundDeposit = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { date, reference, description, mode, amount } = req.body;
+
+    const booking = await Booking.findById(id);
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+    /* ---------- validations ---------- */
+    const refundDue = booking.refundDueToCustomer ?? 0;
+    if (amount <= 0) throw new Error("Amount must be greater than zero");
+    if (amount > refundDue)
+      throw new Error(
+        `Refund exceeds deposit remaining (max ${refundDue.toFixed(2)})`
+      );
+
+    /* ---------- create refund row ---------- */
+    const seq = await getNextSequenceValue("refundDeposits");
+    booking.refundableDepositPayments.push({
+      date: date ? new Date(date) : new Date(),
+      serialNumber: `RF${String(seq).padStart(6, "0")}`,
+      reference,
+      description: description || "Refund to customer",
+      mode,
+      amount: -amount, // negative because money leaves the business
+    });
+
+    /* ---------- recompute balances ---------- */
+    recomputeFinancials(booking); // <── add this
+
+    await booking.save();
+    return res.json(booking);
+  } catch (err) {
+    return res.status(400).json({ message: err.message });
+  }
+};
+
+/* DELETE-PAYMENT (called from payments table actions) */
+export const deletePayment = async (req, res) => {
+  try {
+    const { id, serial } = req.params;
+
+    /* ---------- fetch booking ---------- */
+    const booking = await Booking.findById(id);
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+    /* ---------- helpers ---------- */
+    const seqOf = (sn) => sn.slice(2); // 'DP000123' → '000123'
+
+    const removeRow = (arr, sn) => {
+      const before = arr.length;
+      arr = arr.filter((p) => p.serialNumber !== sn);
+      return { removed: before !== arr.length, arr };
+    };
+
+    /* ---------- step 1: locate the row ---------- */
+    const inAdv = booking.advancePayments.find(
+      (p) => p.serialNumber === serial
+    );
+    const inDep = booking.refundableDepositPayments.find(
+      (p) => p.serialNumber === serial
+    );
+
+    if (!inAdv && !inDep)
+      return res.status(404).json({ message: "Payment not found" });
+
+    /* ---------- step 2: delete the requested row (and twin if needed) ---------- */
+    const deletePairIfNeeded = () => {
+      /* —— A. deletion inside advancePayments —— */
+      if (inAdv) {
+        const { arr } = removeRow(booking.advancePayments, serial);
+        booking.advancePayments = arr;
+
+        if (inAdv.mode === "deposit") {
+          // it is the PY side of a pair – delete matching DP…
+          const twin = `DP${seqOf(serial)}`;
+          booking.refundableDepositPayments =
+            booking.refundableDepositPayments.filter(
+              (p) => p.serialNumber !== twin
+            );
+        }
+      }
+
+      /* —— B. deletion inside refundableDepositPayments —— */
+      if (inDep) {
+        const { arr } = removeRow(booking.refundableDepositPayments, serial);
+        booking.refundableDepositPayments = arr;
+
+        if (inDep.mode === "deposit" && inDep.amount < 0) {
+          // negative DP… row → its twin is the PY side
+          const twin = `PY${seqOf(serial)}`;
+          booking.advancePayments = booking.advancePayments.filter(
+            (p) => p.serialNumber !== twin
+          );
+        }
+      }
+    };
+
+    deletePairIfNeeded();
+
+    /* ---------- step 3: validate pool won’t turn negative ---------- */
+    const depositSum = booking.refundableDepositPayments.reduce(
+      (s, p) => s + Number(p.amount || 0),
+      0
+    );
+
+    if (depositSum < 0) {
+      return res.status(400).json({
+        message:
+          "Cannot delete: refundable-deposit pool would become negative.",
+      });
+    }
+
+    /* ---------- step 4: recompute aggregates ---------- */
+    recomputeFinancials(booking);
+    await booking.save();
+
+    return res.json({ message: "Payment deleted", booking });
+  } catch (err) {
+    return res.status(400).json({ message: err.message });
+  }
+};
+
+// Edit Payment PATCH /api/bookings/:id/payments/:serial
+// controllers/bookingController.js
+export const updatePayment = async (req, res) => {
+  try {
+    const { id, serial } = req.params;
+    const { date, reference, description, mode, amount } = req.body;
+
+    /* ───── fetch booking ───── */
+    const booking = await Booking.findById(id);
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+    /* ───── helpers ───── */
+    const seqOf = (sn) => sn.slice(2); // 'DP000123' → '000123'
+    const findRow = (arr) => arr.find((p) => p.serialNumber === serial);
+
+    /* original row (before edit) */
+    const orig =
+      findRow(booking.advancePayments) ||
+      findRow(booking.refundableDepositPayments);
+
+    if (!orig) return res.status(404).json({ message: "Payment not found" });
+
+    /* ── 1. Row-level validation ────────────────────────────── */
+    if (
+      orig.mode === "deposit" &&
+      orig.serialNumber.startsWith("DP") && // deposit-collected row
+      orig.amount > 0 // positive = collected
+    ) {
+      const proposed = amount !== undefined ? Number(amount) : orig.amount;
+      if (proposed > orig.amount) {
+        return res.status(400).json({
+          message: `Deposit cannot be increased beyond original amount (${orig.amount.toFixed(
+            2
+          )}). You may only reduce or keep it the same.`,
+        });
+      }
+    }
+
+    /* ── 2. Mutate the edited row ───────────────────────────── */
+    const apply = (row) => {
+      if (date) row.date = new Date(date);
+      if (reference) row.reference = reference;
+      if (description) row.description = description;
+      if (mode) row.mode = mode;
+      if (amount !== undefined) row.amount = Number(amount);
+    };
+
+    const patchRow = (arr, sn, mutator) => {
+      const idx = arr.findIndex((p) => p.serialNumber === sn);
+      if (idx !== -1) mutator(arr[idx]);
+      return idx !== -1;
+    };
+
+    const editedInAdv = patchRow(booking.advancePayments, serial, apply);
+    const editedInDep =
+      !editedInAdv &&
+      patchRow(booking.refundableDepositPayments, serial, apply);
+
+    /* ── 3. Keep the deposit pair (PY / DP) in sync ─────────── */
+    const syncPair = () => {
+      /* edited a PY… (deposit applied) ─> sync DP… */
+      if (editedInAdv) {
+        const py = findRow(booking.advancePayments);
+        if (py?.mode === "deposit") {
+          const twin = `DP${seqOf(serial)}`; // same seq, different prefix
+          patchRow(booking.refundableDepositPayments, twin, (dp) => {
+            dp.amount = -Math.abs(py.amount);
+            dp.date = py.date;
+            dp.reference = py.reference;
+            dp.description = py.description;
+          });
+        }
+      }
+
+      /* edited a DP… (deposit ledger) ─> sync PY… */
+      if (editedInDep) {
+        const dp = findRow(booking.refundableDepositPayments);
+        if (dp?.mode === "deposit") {
+          const twin = `PY${seqOf(serial)}`;
+          patchRow(booking.advancePayments, twin, (py) => {
+            py.amount = Math.abs(dp.amount); // positive
+            py.date = dp.date;
+            py.reference = dp.reference;
+            py.description = dp.description;
+          });
+        }
+      }
+    };
+
+    syncPair();
+
+    /* ── 4. Global pool validation ──────────────────────────── */
+    const depositSum = calcSum(booking.refundableDepositPayments); // helper already in this file
+    if (depositSum < 0) {
+      return res.status(400).json({
+        message:
+          "Change rejected: resulting refundable-deposit balance would be negative.",
+      });
+    }
+
+    /* ── 5. Re-compute aggregates & save ────────────────────── */
+    recomputeFinancials(booking);
+    await booking.save();
+
+    return res.json({ message: "Payment updated", booking });
   } catch (err) {
     return res.status(400).json({ message: err.message });
   }

@@ -11,9 +11,20 @@ const PaymentDetailsSchema = new Schema(
     description: { type: String, required: true },
     mode: {
       type: String,
-      enum: ["cash", "bank transfer", "cheque"],
+      enum: ["cash", "bank transfer", "cheque", "deposit"],
       required: true,
     },
+    amount: { type: Number, required: true },
+  },
+  { _id: false }
+);
+
+const FinalInvoiceLineItemSchema = new Schema(
+  {
+    type: { type: String }, // Coffee, Damages, …
+    description: { type: String },
+    cost: { type: Number }, // NEW
+    quantity: { type: Number }, // NEW
     amount: { type: Number, required: true },
   },
   { _id: false }
@@ -23,12 +34,7 @@ const FinalInvoiceSchema = new Schema(
   {
     invoiceNumber: { type: String },
     dateIssued: { type: Date },
-    lineItems: [
-      {
-        description: { type: String },
-        amount: { type: Number },
-      },
-    ],
+    lineItems: [FinalInvoiceLineItemSchema], // use the new schema
     subtotal: { type: Number },
     vat: { type: Number },
     total: { type: Number },
