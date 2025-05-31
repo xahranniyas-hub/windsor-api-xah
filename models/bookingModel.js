@@ -5,6 +5,26 @@ import mongoose from "mongoose";
 const { Schema, model } = mongoose;
 
 /* ----------------------------------------------------
+ * Helpers for customTime validation
+ * --------------------------------------------------*/
+
+/** return minutes between start and end;
+ *  if end is ≤ start we treat it as “next day”       */
+function durationMinutes(startHHMM, endHHMM) {
+  const [sH, sM] = startHHMM.split(":").map(Number);
+  const [eH, eM] = endHHMM.split(":").map(Number);
+
+  const start = sH * 60 + sM;
+  let end = eH * 60 + eM;
+
+  if (end <= start) end += 24 * 60; // cross-midnight
+
+  return end - start; // always positive
+}
+
+const MAX_EVENT_MINUTES = 12 * 60; // 12 h safety cap
+
+/* ----------------------------------------------------
  * Shared sub‑documents
  * --------------------------------------------------*/
 const TimeDurationSchema = new Schema(
@@ -214,28 +234,28 @@ const BookingSchema = new Schema(
 /* ----------------------------------------------------
  * Validators – ensure start < end
  * --------------------------------------------------*/
+
 BookingSchema.pre("validate", function (next) {
-  const t = this.customTime;
-  if (t) {
-    const [sH, sM] = t.start.split(":").map(Number);
-    const [eH, eM] = t.end.split(":").map(Number);
-    if (sH * 60 + sM >= eH * 60 + eM) {
+  if (this.customTime) {
+    const { start, end } = this.customTime;
+    const dur = durationMinutes(start, end);
+
+    if (dur <= 0) {
       return next(
-        new Error("customTime.start must be earlier than customTime.end")
+        new Error("customTime.end must be later than customTime.start")
+      );
+    }
+
+    if (dur > MAX_EVENT_MINUTES) {
+      return next(
+        new Error(
+          `Custom time range is too long (${(dur / 60).toFixed(
+            1
+          )} h). Maximum allowed is ${MAX_EVENT_MINUTES / 60} h.`
+        )
       );
     }
   }
-  next();
-});
-
-BookingSchema.pre("save", function (next) {
-  const pos = this.refundableDepositPayments
-    .filter((p) => p.amount > 0)
-    .reduce((s, p) => s + p.amount, 0);
-  this.refundableDepositOutstanding = Math.max(
-    0,
-    (this.refundableDepositDue || 0) - pos
-  );
   next();
 });
 

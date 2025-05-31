@@ -1,6 +1,22 @@
 import mongoose from "mongoose";
 const { Schema, model } = mongoose;
 
+/* helper — works for same-day or cross-midnight (“next-day”) ranges */
+function durationMinutes(startHHMM, endHHMM) {
+  const [sH, sM] = startHHMM.split(":").map(Number);
+  const [eH, eM] = endHHMM.split(":").map(Number);
+
+  const start = sH * 60 + sM;
+  let end = eH * 60 + eM;
+
+  // if the clock-time looks earlier, treat it as ‘next day’
+  if (end <= start) end += 24 * 60;
+
+  return end - start; // always positive
+}
+
+const MAX_EVENT_MINUTES = 12 * 60; // 12 h sanity cap
+
 /* ----------------------------------------------------
  * Sub‑documents
  * --------------------------------------------------*/
@@ -101,13 +117,22 @@ const PencilBookingSchema = new Schema(
  * --------------------------------------------------*/
 PencilBookingSchema.pre("validate", function (next) {
   if (this.customTime) {
-    const [sH, sM] = this.customTime.start.split(":").map(Number);
-    const [eH, eM] = this.customTime.end.split(":").map(Number);
-    if (sH * 60 + sM >= eH * 60 + eM) {
+    const { start, end } = this.customTime;
+    const dur = durationMinutes(start, end);
+
+    if (dur <= 0)
       return next(
-        new Error("customTime.start must be earlier than customTime.end")
+        new Error("customTime.end must be later than customTime.start")
       );
-    }
+
+    if (dur > MAX_EVENT_MINUTES)
+      return next(
+        new Error(
+          `Custom time range is too long (${(dur / 60).toFixed(
+            1
+          )} h). Maximum allowed is ${MAX_EVENT_MINUTES / 60} h.`
+        )
+      );
   }
   next();
 });

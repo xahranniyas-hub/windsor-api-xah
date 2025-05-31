@@ -3,6 +3,17 @@ import PencilBooking from "../models/pencilBookingModel.js";
 import Booking from "../models/bookingModel.js";
 import { getNextSequenceValue } from "../utils/getNextSequenceValue.js";
 
+/* ----------------------------------------------------
+ * helper – minutes between two HH:mm strings
+ * ----------------------------------------------------*/
+function diffMinutes(start, end) {
+  const [sH, sM] = start.split(":").map(Number);
+  const [eH, eM] = end.split(":").map(Number);
+  let d = eH * 60 + eM - (sH * 60 + sM);
+  if (d <= 0) d += 24 * 60; // rolls into next day
+  return d; // always positive
+}
+
 const ALLOWED_BALLROOMS = ["Grand", "Diamond", "Royal"];
 
 /* ────────────────────────────────────────────────────────── *
@@ -73,10 +84,10 @@ export const createPencilBooking = async (req, res) => {
       }
       const [sH, sM] = customTime.start.split(":").map(Number);
       const [eH, eM] = customTime.end.split(":").map(Number);
-      if (sH * 60 + sM >= eH * 60 + eM) {
-        return res.status(400).json({
-          message: "customTime.start must be earlier than customTime.end.",
-        });
+      if (diffMinutes(customTime.start, customTime.end) <= 0) {
+        return res
+          .status(400)
+          .json({ message: "Invalid custom time range (zero length)." });
       }
     }
 
@@ -167,10 +178,10 @@ export const convertPencilBooking = async (req, res) => {
 
     const [sH, sM] = customTime.start.split(":").map(Number);
     const [eH, eM] = customTime.end.split(":").map(Number);
-    if (sH * 60 + sM >= eH * 60 + eM)
-      return res.status(400).json({
-        message: "customTime.start must be earlier than customTime.end.",
-      });
+    if (diffMinutes(customTime.start, customTime.end) <= 0)
+      return res
+        .status(400)
+        .json({ message: "Invalid custom time range (zero length)." });
 
     /* 1️⃣  Validate ballrooms */
     const ballroomErr = validateBallroomArray(ballrooms);
