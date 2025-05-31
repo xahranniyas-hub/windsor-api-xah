@@ -57,9 +57,28 @@ export const createPencilBooking = async (req, res) => {
       ballrooms,
       customerInfo,
       foodMenu,
+      menuDescription,
       foodMenuCost,
       indicativePricing,
+      customTime,
     } = req.body;
+
+    /* 0️⃣  validate customTime if supplied ------------------- */
+    if (customTime) {
+      const HHMM = /^([0-1]?\d|2[0-3]):[0-5]\d$/;
+      if (!HHMM.test(customTime.start) || !HHMM.test(customTime.end)) {
+        return res
+          .status(400)
+          .json({ message: "customTime must be in HH:mm 24-hour format." });
+      }
+      const [sH, sM] = customTime.start.split(":").map(Number);
+      const [eH, eM] = customTime.end.split(":").map(Number);
+      if (sH * 60 + sM >= eH * 60 + eM) {
+        return res.status(400).json({
+          message: "customTime.start must be earlier than customTime.end.",
+        });
+      }
+    }
 
     /* 1️⃣  Validate ballrooms */
     const ballroomErr = validateBallroomArray(ballrooms);
@@ -79,9 +98,11 @@ export const createPencilBooking = async (req, res) => {
       serialNumber,
       date,
       timeSlot,
+      ...(customTime ? { customTime } : {}), // ② persist it when present
       ballrooms,
       customerInfo,
       foodMenu,
+      menuDescription,
       foodMenuCost,
       indicativePricing,
       expiryDate,
@@ -119,15 +140,37 @@ export const convertPencilBooking = async (req, res) => {
     const {
       date,
       timeSlot,
+      customTime,
       ballrooms,
       customerInfo,
       discount,
       advancePayments = [],
-      refundableDepositPayments = [],
+      refundableDepositDue,
+      additionalCosts = [],
       foodMenu,
+      menuDescription,
       foodMenuCost,
       indicativePricing,
     } = req.body;
+
+    /* 0️⃣  Validate custom time */
+    if (!customTime || !customTime.start || !customTime.end)
+      return res
+        .status(400)
+        .json({ message: "customTime { start, end } is required." });
+
+    const HHMM = /^([0-1]?\d|2[0-3]):[0-5]\d$/;
+    if (!HHMM.test(customTime.start) || !HHMM.test(customTime.end))
+      return res
+        .status(400)
+        .json({ message: "customTime must be in HH:mm 24-hour format." });
+
+    const [sH, sM] = customTime.start.split(":").map(Number);
+    const [eH, eM] = customTime.end.split(":").map(Number);
+    if (sH * 60 + sM >= eH * 60 + eM)
+      return res.status(400).json({
+        message: "customTime.start must be earlier than customTime.end.",
+      });
 
     /* 1️⃣  Validate ballrooms */
     const ballroomErr = validateBallroomArray(ballrooms);
@@ -141,29 +184,47 @@ export const convertPencilBooking = async (req, res) => {
         .status(400)
         .json({ message: "Indicative pricing must be > 0." });
 
-    /* 3️⃣  Check sums for payments */
-    const totalAdvance = advancePayments.reduce(
+    /* 3️⃣  Validate additionalCosts */
+    for (const [i, c] of additionalCosts.entries()) {
+      if (!c.type || c.amount == null)
+        return res
+          .status(400)
+          .json({ message: `Line-item #${i + 1} is incomplete.` });
+      if (c.amount <= 0)
+        return res
+          .status(400)
+          .json({ message: `Line-item #${i + 1} amount must be > 0.` });
+    }
+    const totalExtra = additionalCosts.reduce(
       (s, { amount = 0 }) => s + amount,
       0
     );
-    const totalDeposit = refundableDepositPayments.reduce(
+
+    /* 4️⃣  Validate payments & deposit */
+    const totalAdvance = advancePayments.reduce(
       (s, { amount = 0 }) => s + amount,
       0
     );
     if (totalAdvance <= 0)
       return res.status(400).json({ message: "Advance must be > 0." });
-    if (totalDeposit <= 0)
-      return res.status(400).json({ message: "Deposit must be > 0." });
-    if (totalAdvance > indicativePricing)
+    if (
+      totalAdvance >
+      indicativePricing + totalExtra + (refundableDepositDue || 0)
+    )
       return res.status(400).json({ message: "Advance exceeds total cost." });
 
-    /* 4️⃣  Locate pencil booking */
+    if (refundableDepositDue == null || refundableDepositDue <= 0)
+      return res
+        .status(400)
+        .json({ message: "Refundable deposit amount must be > 0." });
+
+    /* 5️⃣  Locate pencil booking */
     const pencil = await PencilBooking.findById(id);
     if (!pencil) return res.status(404).json({ message: "Pencil not found." });
     if (pencil.status !== "active")
       return res.status(400).json({ message: "Pencil booking is not active." });
 
-    /* 5️⃣  Conflict checks */
+    /* 6️⃣  Conflict checks */
     const conflictMsg = await hasConflict({
       date,
       timeSlot,
@@ -172,44 +233,41 @@ export const convertPencilBooking = async (req, res) => {
     });
     if (conflictMsg) return res.status(400).json({ message: conflictMsg });
 
-    /* 6️⃣  Serial numbers for payments */
+    /* 7️⃣  Serial numbers for advance payments */
     for (const p of advancePayments) {
       if (!p.serialNumber) {
         const seq = await getNextSequenceValue("advancePayments");
         p.serialNumber = `AP${String(seq).padStart(6, "0")}`;
       }
     }
-    for (const p of refundableDepositPayments) {
-      if (!p.serialNumber) {
-        const seq = await getNextSequenceValue("refundableDepositPayments");
-        p.serialNumber = `RP${String(seq).padStart(6, "0")}`;
-      }
-    }
 
-    /* 7️⃣  Serial for permanent booking */
+    /* 8️⃣  Serial for permanent booking */
     const seq = await getNextSequenceValue("permanentBookings");
     const serialNumber = `BK${String(seq).padStart(6, "0")}`;
 
-    /* 8️⃣  Create permanent booking */
+    /* 9️⃣  Create permanent booking */
     const newBooking = await Booking.create({
       pencilBookingId: pencil._id,
       serialNumber,
       date,
       timeSlot,
+      customTime,
       ballrooms,
       customerInfo,
       foodMenu,
+      menuDescription,
       foodMenuCost,
       indicativePricing,
       discount,
       advancePayments,
-      refundableDepositPayments,
-      balanceDue: indicativePricing - totalAdvance,
-      refundDueToCustomer: totalDeposit,
+      refundableDepositDue,
+      additionalCosts,
+      balanceDue:
+        indicativePricing + totalExtra + refundableDepositDue - totalAdvance,
       status: "confirmed",
     });
 
-    /* 9️⃣  Update pencil status */
+    /* 🔟  Update pencil status */
     pencil.status = "converted";
     await pencil.save();
 

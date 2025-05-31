@@ -1,14 +1,38 @@
 import mongoose from "mongoose";
 const { Schema, model } = mongoose;
 
+/* ----------------------------------------------------
+ * Sub‑documents
+ * --------------------------------------------------*/
 const BallroomSubSchema = new Schema(
   {
     name: { type: String, enum: ["Grand", "Diamond", "Royal"], required: true },
     guests: { type: Number, min: 1, required: true },
   },
-  { _id: false } // we don’t need a sub-document id
+  { _id: false }
 );
 
+// Optional custom time range when the default Lunch/Dinner windows
+// don’t fit the event (e.g. 19:00‑23:00)
+const TimeDurationSchema = new Schema(
+  {
+    start: {
+      type: String, // HH:mm, 24‑hour
+      required: true,
+      match: /^([0-1]?\d|2[0-3]):[0-5]\d$/,
+    },
+    end: {
+      type: String,
+      required: true,
+      match: /^([0-1]?\d|2[0-3]):[0-5]\d$/,
+    },
+  },
+  { _id: false }
+);
+
+/* ----------------------------------------------------
+ * Main schema
+ * --------------------------------------------------*/
 const PencilBookingSchema = new Schema(
   {
     serialNumber: { type: String, unique: true },
@@ -16,7 +40,10 @@ const PencilBookingSchema = new Schema(
     date: { type: Date, required: true },
     timeSlot: { type: String, enum: ["Lunch", "Dinner"], required: true },
 
-    /** ⇣  MULTIPLE BALLROOMS  ⇣ **/
+    // ⇣ Optional override for the standard Lunch/Dinner window ⇣
+    customTime: { type: TimeDurationSchema },
+
+    /* ---------- multiple ballrooms ---------- */
     ballrooms: { type: [BallroomSubSchema], required: true },
 
     customerInfo: {
@@ -50,6 +77,12 @@ const PencilBookingSchema = new Schema(
         "Customized_Menu",
       ],
     },
+    /* ✨ NEW ✨ */
+    menuDescription: {
+      type: String,
+      trim: true,
+      maxlength: 1_000, // tweak as you like
+    },
     foodMenuCost: { type: Number },
     indicativePricing: { type: Number },
 
@@ -62,5 +95,21 @@ const PencilBookingSchema = new Schema(
   },
   { timestamps: true }
 );
+
+/* ----------------------------------------------------
+ * Validators & hooks
+ * --------------------------------------------------*/
+PencilBookingSchema.pre("validate", function (next) {
+  if (this.customTime) {
+    const [sH, sM] = this.customTime.start.split(":").map(Number);
+    const [eH, eM] = this.customTime.end.split(":").map(Number);
+    if (sH * 60 + sM >= eH * 60 + eM) {
+      return next(
+        new Error("customTime.start must be earlier than customTime.end")
+      );
+    }
+  }
+  next();
+});
 
 export default model("PencilBooking", PencilBookingSchema);

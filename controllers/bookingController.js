@@ -9,28 +9,47 @@ const calcTotalAdvance = (adv = []) =>
 const calcSum = (arr = []) =>
   arr.reduce((s, p) => s + Number(p.amount || 0), 0);
 
+const calcDepositCollected = (rows = []) =>
+  rows.reduce((s, p) => s + (p.amount > 0 ? Number(p.amount) : 0), 0);
+
 /**
  * (re)computes: balanceDue ‖ refundDueToCustomer ‖ finalInvoice.status
  * call this after you push / splice any payment rows.
  */
 function recomputeFinancials(booking) {
+  /* ——— 1. invoice balance (compute FIRST) ——— */
   const invoiceTotal = booking.finalInvoice?.total ?? 0;
+  const paymentsTotal = calcSum(booking.advancePayments); // AP + PY rows
+  booking.balanceDue = Math.max(0, invoiceTotal - paymentsTotal);
 
-  /* ▶ payments that affect the invoice ◀ */
-  const paymentsTotal = calcSum(booking.advancePayments); // AP + PY + deposit-as-PY
+  /* ——— 2. break the deposit ledger into parts ——— */
+  const pos = booking.refundableDepositPayments // all cash collected
+    .filter((p) => p.amount > 0)
+    .reduce((s, p) => s + p.amount, 0);
 
-  /* ▶ refundable-deposit pool ◀           (positive rows = collected) */
-  const depositSum = calcSum(booking.refundableDepositPayments); // negative rows reduce pool
+  const negDeposit = booking.refundableDepositPayments // applied to invoice
+    .filter((p) => p.amount < 0 && p.mode === "deposit")
+    .reduce((s, p) => s + Math.abs(p.amount), 0);
 
-  booking.balanceDue = invoiceTotal - paymentsTotal; // deposit already in payments
-  if (booking.balanceDue < 0) booking.balanceDue = 0; // never show negative due
+  const negRefund = booking.refundableDepositPayments // paid back to customer
+    .filter((p) => p.amount < 0 && p.mode !== "deposit")
+    .reduce((s, p) => s + Math.abs(p.amount), 0);
 
-  booking.refundDueToCustomer = Math.max(0, depositSum); // leftover deposit
+  const depositCollected = Math.max(0, pos - negDeposit - negRefund); // in hand
+  const depositUsed = negDeposit; // applied
 
-  // If the pool is negative you already *over-refunded*. Flag it visibly.
-  if (depositSum < 0)
-    console.warn(`Booking ${booking.serialNumber} has a negative deposit pool`);
+  /* ——— 3. what is still to be collected ——— */
+  const due = booking.refundableDepositDue || 0;
+  booking.refundableDepositOutstanding = Math.max(0, due - pos);
 
+  /* ——— 4. cash to refund *after* invoice is settled ——— */
+  booking.refundDueToCustomer = booking.balanceDue === 0 ? depositCollected : 0;
+
+  /* ——— 5. expose helper numbers to the client ——— */
+  booking.depositCollected = depositCollected;
+  booking.depositUsed = depositUsed;
+
+  /* ——— 6. update invoice status ——— */
   if (booking.finalInvoice) {
     booking.finalInvoice.status = booking.balanceDue === 0 ? "Settled" : "Open";
   }
@@ -72,19 +91,41 @@ export const addAdvancePayment = async (req, res) => {
     const booking = await Booking.findById(id);
     if (!booking) return res.status(404).json({ message: "Booking not found" });
 
-    const seq = await getNextSequenceValue("advancePayments");
-    const serialNumber = `AP${String(seq).padStart(6, "0")}`;
+    /* ----- 1. How much deposit is still un-collected? ----- */
+    const outstanding = booking.refundableDepositOutstanding || 0;
+    let toDeposit = Math.min(outstanding, amount); // allocate as much as needed
+    let toInvoice = amount - toDeposit;
 
-    booking.advancePayments.push({
-      date,
-      serialNumber,
-      reference,
-      description,
-      mode,
-      amount,
-    });
+    /* ----- 2. Serial numbers ----- */
+    const seq = await getNextSequenceValue("advancePayments"); // one seq for both rows
 
+    /* ----- 3. PUSH deposit row first (if any) ----- */
+    if (toDeposit > 0) {
+      booking.refundableDepositPayments.push({
+        date,
+        serialNumber: `DP${String(seq).padStart(6, "0")}`,
+        reference,
+        description: description || "Deposit collected",
+        mode,
+        amount: toDeposit, // positive!
+      });
+    }
+
+    /* ----- 4. PUSH invoice/advance row (if any) ----- */
+    if (toInvoice > 0) {
+      booking.advancePayments.push({
+        date,
+        serialNumber: `AP${String(seq).padStart(6, "0")}`,
+        reference,
+        description,
+        mode,
+        amount: toInvoice,
+      });
+    }
+
+    /* ----- 5. Recompute aggregates ----- */
     recomputeFinancials(booking);
+
     await booking.save();
 
     return res.json(booking);
@@ -97,10 +138,19 @@ export const addAdvancePayment = async (req, res) => {
 export const receivePayment = async (req, res) => {
   try {
     const { id } = req.params;
-    const { depositApplied = 0, payment = null } = req.body;
+    const { depositApplied = 0, payment = null, target = "invoice" } = req.body;
 
     const booking = await Booking.findById(id);
     if (!booking) throw new Error("Booking not found");
+
+    /* guard: cannot apply deposit that hasn’t been collected yet */
+    const pool = calcDepositCollected(booking.refundableDepositPayments);
+    if (depositApplied > pool)
+      throw new Error(
+        `Cannot apply Rs ${depositApplied.toFixed(2)}; only Rs ${pool.toFixed(
+          2
+        )} of the deposit has been collected.`
+      );
 
     /* ───  A.  move deposit → a PY row  ─────────────────────── */
     if (depositApplied > 0) {
@@ -184,14 +234,19 @@ export const updateBooking = async (req, res) => {
 /* ------------------------------------------------------------------ */
 /*  FINAL INVOICE – create / update                                   */
 /* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------ */
+/*  FINAL INVOICE – create / update                                   */
+/* ------------------------------------------------------------------ */
 export const generateFinalInvoice = async (req, res) => {
   try {
     const { id } = req.params;
-    let { invoiceNumber, additionalIncome = [] } = req.body;
+    let { invoiceNumber, additionalCosts = [] } = req.body;
 
     /* ---------- fetch booking ---------- */
     const booking = await Booking.findById(id);
-    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
 
     /* ---------- invoice # if missing ---------- */
     if (!invoiceNumber) {
@@ -199,11 +254,10 @@ export const generateFinalInvoice = async (req, res) => {
       invoiceNumber = `IN${seq.toString().padStart(6, "0")}`;
     }
 
-    /* ---------- normalise line-items ---------- */
-    additionalIncome = additionalIncome.map((row) => {
+    /* ---------- normalise NEW rows ---------- */
+    additionalCosts = additionalCosts.map((row) => {
       const cost = Number(row.cost) || 0;
       const quantity = Number(row.quantity) || 0;
-
       return {
         type: row.type || "",
         description: row.description || "",
@@ -213,33 +267,32 @@ export const generateFinalInvoice = async (req, res) => {
       };
     });
 
+    /* ---------- merge NEW rows with EXISTING ones ---------- */
+    booking.additionalCosts.push(...additionalCosts);
+
     /* ---------- totals ---------- */
-    const addIncomeTotal = additionalIncome.reduce(
-      (sum, r) => sum + r.amount,
+    const totalExtra = booking.additionalCosts.reduce(
+      (s, r) => s + r.amount,
       0
     );
-
-    const subtotal = Number(booking.indicativePricing) + addIncomeTotal;
-    const vat = 0; // change if you need VAT later
+    const subtotal = Number(booking.indicativePricing) + totalExtra;
+    const vat = 0; // add VAT here if needed
     const total = subtotal + vat;
 
-    /* ─────────────────────────────────────────────────────── */
-    /*  write invoice object BEFORE recomputing financials     */
+    /* ---------- write / update invoice ---------- */
     booking.finalInvoice = {
       invoiceNumber,
       dateIssued: new Date(),
-      lineItems: additionalIncome,
+      lineItems: booking.additionalCosts, // <─ take the unified list
       subtotal,
       vat,
       total,
     };
-    /* ─────────────────────────────────────────────────────── */
 
-    booking.status = "completed"; // booking is now done
-    recomputeFinancials(booking); // sets balanceDue & invoice.status
+    booking.status = "completed";
+    recomputeFinancials(booking);
 
     await booking.save();
-
     return res.json({ message: "Final invoice updated", booking });
   } catch (err) {
     console.error(err);
