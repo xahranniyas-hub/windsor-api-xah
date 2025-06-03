@@ -272,6 +272,8 @@ export const convertPencilBooking = async (req, res) => {
       discount,
       advancePayments,
       refundableDepositDue,
+      // initialize “owed” = deposit‐due
+      refundableDepositOutstanding: Number(refundableDepositDue) || 0,
       additionalCosts,
       balanceDue:
         indicativePricing + totalExtra + refundableDepositDue - totalAdvance,
