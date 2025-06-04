@@ -21,7 +21,7 @@ const router = express.Router();
 router.get(
   "/",
   protect,
-  authorizeRole(["admin", "editor", "viewer"]),
+  authorizeRole(["calendar", "admin", "editor", "viewer"]),
   getAllBookings
 );
 
@@ -29,7 +29,7 @@ router.get(
 router.get(
   "/:id",
   protect,
-  authorizeRole(["admin", "editor", "viewer"]),
+  authorizeRole(["calendar", "admin", "editor", "viewer"]),
   getBookingById
 );
 

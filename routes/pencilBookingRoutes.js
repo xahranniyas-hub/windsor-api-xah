@@ -15,7 +15,7 @@ const router = express.Router();
 router.post(
   "/",
   protect,
-  authorizeRole(["editor", "admin"]),
+  authorizeRole(["calendar", "editor", "admin"]),
   createPencilBooking
 );
 
@@ -23,7 +23,7 @@ router.post(
 router.get(
   "/",
   protect,
-  authorizeRole(["editor", "admin"]),
+  authorizeRole(["calendar", "editor", "admin"]),
   listActivePencilBookings
 );
 

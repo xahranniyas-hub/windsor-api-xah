@@ -16,7 +16,7 @@ const UserSchema = new Schema(
     },
     role: {
       type: String,
-      enum: ["viewer", "editor", "admin"],
+      enum: ["viewer", "calendar", "editor", "admin"],
       default: "viewer",
     },
     email: {
