@@ -567,3 +567,110 @@ export const updatePayment = async (req, res) => {
     return res.status(400).json({ message: err.message });
   }
 };
+
+import nodemailer from "nodemailer";
+import path from "path";
+import puppeteer from "puppeteer";
+import { fileURLToPath } from "url";
+
+// Helper to locate your frontend’s “printable” URL. For example, if your React app
+// has a route at /print-booking/:id that renders <BookingPrint>, point Puppeteer at it.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Ideally, your React app is hosted at SOME_BASE_URL. In development, that might be http://localhost:3000
+// In production, set this to your deployed front-end domain.
+const FRONTEND_BASE_URL =
+  process.env.FRONTEND_BASE_URL || "http://localhost:5173";
+
+export const emailBookingPdf = async (req, res) => {
+  const bookingId = req.params.id;
+
+  try {
+    // 1. Fetch booking
+    const booking = await Booking.findById(bookingId).lean();
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found." });
+    }
+
+    // 2. Ensure customer email exists
+    const customerEmail = booking.customerInfo?.email;
+    if (!customerEmail) {
+      return res
+        .status(400)
+        .json({ message: "Customer has no email on file." });
+    }
+
+    /** 3. Launch Puppeteer and generate PDF **/
+
+    // a) Launch headless Chrome
+    const browser = await puppeteer.launch({
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+    const page = await browser.newPage();
+
+    // b) Build the URL that renders your React <BookingPrint> for this booking.
+    //    Somewhere in your React app you might have a route like /print-booking/:id
+    //    that simply renders <BookingPrint bookingId={id} /> and fetches its data.
+    //
+    //    If you don’t have such a route, you can create one in your front end that:
+    //    - Reads the booking ID from the URL param
+    //    - Fetches booking data from your API (/api/bookings/:id)
+    //    - Renders <BookingPrint booking={...} />
+    //
+    //    For example: <Route path="/print-booking/:id" element={<BookingPrintPage />} />
+    const printableUrl = `${FRONTEND_BASE_URL}/print-booking/${bookingId}`;
+
+    // c) Navigate there and wait until network is idle
+    await page.goto(printableUrl, { waitUntil: "networkidle0" });
+
+    // d) Generate the PDF buffer
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "1cm", bottom: "1cm", left: "1cm", right: "1cm" },
+    });
+
+    await browser.close();
+
+    /** 4. Send email via Nodemailer **/
+
+    // a) Create a transporter (e.g., using SMTP). You must set these env vars in .env:
+    //    SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT || 587),
+      secure: process.env.SMTP_SECURE === "true", // true for 465, false for other ports
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+
+    // b) Prepare email options
+    const mailOptions = {
+      from: `"Windsor Castle Banquet" <${process.env.SMTP_FROM_ADDRESS}>`,
+      to: customerEmail,
+      subject: `Windsor Castle Booking Memo`,
+      text: `Dear ${booking.customerInfo.name},\n\nPlease find attached the memo for your booking ${booking.serialNumber}.\n\nThank you for choosing us!\n\n--\nWindsor Castle Banquet (Pvt) Ltd\nNo. 292, Attidiya Road, Dehiwala\n\nEmail: windsorcastlebanquet@gmail.com\nPhone: +94 112 721 421 | +94 74 315 8784`,
+      attachments: [
+        {
+          filename: `Booking_${booking.serialNumber || bookingId}.pdf`,
+          content: pdfBuffer,
+        },
+      ],
+    };
+
+    // c) Send mail
+    const info = await transporter.sendMail(mailOptions);
+
+    return res
+      .status(200)
+      .json({ message: "Email sent", messageId: info.messageId });
+  } catch (err) {
+    console.error("Error in emailBookingPdf:", err);
+    return res
+      .status(500)
+      .json({ message: "Server error sending email.", error: err.message });
+  }
+};

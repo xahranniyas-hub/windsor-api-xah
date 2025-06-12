@@ -1,5 +1,6 @@
 // routes/bookingRoutes.js
 import express from "express";
+import { check, validationResult } from "express-validator";
 import {
   getAllBookings,
   getBookingById,
@@ -12,6 +13,7 @@ import {
   refundDeposit,
   deletePayment,
   updatePayment,
+  emailBookingPdf,
 } from "../controllers/bookingController.js";
 import { protect, authorizeRole } from "../middleware/authMiddleware.js";
 
@@ -24,6 +26,9 @@ router.get(
   authorizeRole(["calendar", "admin", "editor", "viewer"]),
   getAllBookings
 );
+
+// (A) Public route to fetch a single booking, used only by the print‐page:
+router.get("/public/:id", getBookingById);
 
 // GET /api/bookings/:id
 router.get(
@@ -100,5 +105,20 @@ router.delete("/:id/payments/:serial", deletePayment);
 
 // edit payment
 router.patch("/:id/payments/:serial", updatePayment);
+
+// NEW: Email booking PDF (protected or not—up to you)
+router.post(
+  "/:id/email-pdf",
+  protect, // ← if you want only logged‐in users to trigger this
+  authorizeRole(["admin", "editor"]), // adjust as needed
+  [check("id", "Invalid booking ID").isMongoId()],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    return emailBookingPdf(req, res);
+  }
+);
 
 export default router;

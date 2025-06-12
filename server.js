@@ -9,6 +9,8 @@ import authRoutes from "./routes/authRoutes.js";
 import pencilBookingRoutes from "./routes/pencilBookingRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
 import memoRoutes from "./routes/memoRoutes.js";
+import termsRoutes from "./routes/termsRoutes.js";
+import quotationRoutes from "./routes/quotationRoutes.js";
 
 const app = express();
 dotenv.config();
@@ -32,6 +34,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/pencil-bookings", pencilBookingRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/memos", memoRoutes);
+app.use("/api/terms", termsRoutes);
+app.use("/api/quotations", quotationRoutes);
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}!`);
