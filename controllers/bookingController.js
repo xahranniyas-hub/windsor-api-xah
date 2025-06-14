@@ -214,24 +214,56 @@ export const receivePayment = async (req, res) => {
 export const updateBooking = async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
-    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
 
-    /* Updatable fields */
+    /* ─── 1. straight-forward field updates ─────────────────────────── */
     if (req.body.customerInfo) booking.customerInfo = req.body.customerInfo;
     if (req.body.date) booking.date = req.body.date;
     if (req.body.timeSlot) booking.timeSlot = req.body.timeSlot;
-    if (req.body.ballrooms) booking.ballrooms = req.body.ballrooms; // <-- array!
+    if (req.body.ballrooms) booking.ballrooms = req.body.ballrooms; // array
     if (req.body.foodMenu) booking.foodMenu = req.body.foodMenu;
     if (req.body.foodMenuCost) booking.foodMenuCost = req.body.foodMenuCost;
-    if (req.body.indicativePricing !== undefined)
+
+    if (req.body.indicativePricing !== undefined) {
       booking.indicativePricing = req.body.indicativePricing;
+    }
 
     if (req.body.discount !== undefined) {
       booking.discount = req.body.discount;
       booking.approvedDiscount = false; // reset approval
     }
 
-    /* Re-calculate balance due */
+    /* ─── 2. additionalCosts – merge, don’t overwrite ───────────────── */
+    if (Array.isArray(req.body.additionalCosts)) {
+      /* A.  rows coming from the *booking* editor → always editable:false */
+      const bookingTimeRows = req.body.additionalCosts.map((r) => {
+        const cost = Number(r.cost) || 0;
+        const quantity = Number(r.quantity) || 0;
+        const amount =
+          r.amount !== undefined ? Number(r.amount) : cost * quantity;
+
+        return {
+          type: r.type || "",
+          description: r.description || "",
+          cost,
+          quantity,
+          amount,
+          editable: false, // ← lock these for invoice editor
+        };
+      });
+
+      /* B.  keep any invoice-time rows that are already stored */
+      const invoiceRows = (booking.additionalCosts || []).filter(
+        (r) => r.editable
+      );
+
+      /* C.  replace array with merged result */
+      booking.additionalCosts = [...invoiceRows, ...bookingTimeRows];
+    }
+
+    /* ─── 3. re-compute derived balances ────────────────────────────── */
     recomputeFinancials(booking);
 
     await booking.save();
@@ -274,6 +306,7 @@ export const generateFinalInvoice = async (req, res) => {
         cost,
         quantity,
         amount: row.amount !== undefined ? Number(row.amount) : cost * quantity,
+        editable: true,
       };
     });
 
@@ -281,6 +314,10 @@ export const generateFinalInvoice = async (req, res) => {
     additionalCosts = additionalCosts.filter((r) => r.amount !== 0);
 
     /* ---------- merge NEW rows with EXISTING ones ---------- */
+    // in generateFinalInvoice before pushing new rows
+    booking.additionalCosts = booking.additionalCosts.filter(
+      (r) => !r.editable
+    );
     booking.additionalCosts.push(...additionalCosts);
 
     /* ---------- totals ---------- */

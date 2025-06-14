@@ -67,6 +67,7 @@ const CostLineItemSchema = new Schema(
     cost: { type: Number },
     quantity: { type: Number },
     amount: { type: Number, required: true },
+    editable: { type: Boolean, default: false }, // NEW
   },
   { _id: false }
 );
