@@ -17,10 +17,17 @@ const calcDepositCollected = (rows = []) =>
  * call this after you push / splice any payment rows.
  */
 function recomputeFinancials(booking) {
-  /* ——— 1. invoice balance (compute FIRST) ——— */
+  /* ——— 1. invoice balance & over-payments ——— */
   const invoiceTotal = booking.finalInvoice?.total ?? 0;
   const paymentsTotal = calcSum(booking.advancePayments); // AP + PY rows
-  booking.balanceDue = Math.max(0, invoiceTotal - paymentsTotal);
+
+  if (paymentsTotal >= invoiceTotal) {
+    booking.balanceDue = 0;
+    booking.invoiceOverpaid = paymentsTotal - invoiceTotal; // always ≥ 0
+  } else {
+    booking.balanceDue = invoiceTotal - paymentsTotal; // > 0
+    booking.invoiceOverpaid = 0;
+  }
 
   /* ——— 2. break the deposit ledger into parts ——— */
   const pos = booking.refundableDepositPayments // all cash collected
@@ -42,8 +49,11 @@ function recomputeFinancials(booking) {
   const due = booking.refundableDepositDue || 0;
   booking.refundableDepositOutstanding = Math.max(0, due - pos);
 
-  /* ——— 4. cash to refund *after* invoice is settled ——— */
-  booking.refundDueToCustomer = booking.balanceDue === 0 ? depositCollected : 0;
+  /* ——— 4. how much we still owe the customer ——— */
+  //  • invoiceOverpaid is *always* refundable immediately
+  //  • depositCollected only becomes refundable once the invoice is settled
+  booking.refundDueToCustomer =
+    booking.invoiceOverpaid + (booking.balanceDue === 0 ? depositCollected : 0);
 
   /* ——— 5. expose helper numbers to the client ——— */
   booking.depositCollected = depositCollected;
@@ -267,6 +277,9 @@ export const generateFinalInvoice = async (req, res) => {
       };
     });
 
+    // drop any rows that end up with amount === 0
+    additionalCosts = additionalCosts.filter((r) => r.amount !== 0);
+
     /* ---------- merge NEW rows with EXISTING ones ---------- */
     booking.additionalCosts.push(...additionalCosts);
 
@@ -351,19 +364,41 @@ export const refundDeposit = async (req, res) => {
         `Refund exceeds deposit remaining (max ${refundDue.toFixed(2)})`
       );
 
-    /* ---------- create refund row ---------- */
-    const seq = await getNextSequenceValue("refundDeposits");
-    booking.refundableDepositPayments.push({
-      date: date ? new Date(date) : new Date(),
-      serialNumber: `RF${String(seq).padStart(6, "0")}`,
-      reference,
-      description: description || "Refund to customer",
-      mode,
-      amount: -amount, // negative because money leaves the business
-    });
+    /* ---------- allocate refund ---------- */
+    let remaining = amount;
+
+    /* A.  First drain any invoice over-payment -------------------------- */
+    if (booking.invoiceOverpaid > 0) {
+      const used = Math.min(remaining, booking.invoiceOverpaid);
+      booking.invoiceOverpaid -= used;
+      remaining -= used;
+
+      const seqAP = await getNextSequenceValue("refundDeposits");
+      booking.advancePayments.push({
+        date: date ? new Date(date) : new Date(),
+        serialNumber: `RF${String(seqAP).padStart(6, "0")}`,
+        reference,
+        description: description || "Refund – invoice over-payment",
+        mode,
+        amount: -used, // negative cash out
+      });
+    }
+
+    /* B.  Then, if anything left, refund deposit as before --------------- */
+    if (remaining > 0) {
+      const seqDP = await getNextSequenceValue("refundDeposits");
+      booking.refundableDepositPayments.push({
+        date: date ? new Date(date) : new Date(),
+        serialNumber: `RF${String(seqDP).padStart(6, "0")}`,
+        reference,
+        description: description || "Refund – refundable deposit",
+        mode,
+        amount: -remaining,
+      });
+    }
 
     /* ---------- recompute balances ---------- */
-    recomputeFinancials(booking); // <── add this
+    recomputeFinancials(booking);
 
     await booking.save();
     return res.json(booking);

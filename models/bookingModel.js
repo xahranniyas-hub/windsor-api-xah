@@ -209,6 +209,8 @@ const BookingSchema = new Schema(
 
     balanceDue: { type: Number, default: 0 },
 
+    invoiceOverpaid: { type: Number, default: 0 },
+
     /* reschedule / cancel */
     rescheduleRequest: {
       requestedDate: { type: Date },
