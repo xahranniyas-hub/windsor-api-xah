@@ -159,6 +159,11 @@ const BookingSchema = new Schema(
       ],
       required: true,
     },
+    menuDescription: {
+      type: String,
+      trim: true,
+      maxlength: 1_000, // tweak as you like
+    },
     foodMenuCost: { type: Number, required: true },
     indicativePricing: { type: Number, required: true },
 

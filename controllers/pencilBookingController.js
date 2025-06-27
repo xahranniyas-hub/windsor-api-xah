@@ -235,6 +235,17 @@ export const convertPencilBooking = async (req, res) => {
     if (pencil.status !== "active")
       return res.status(400).json({ message: "Pencil booking is not active." });
 
+    /* —— pick the description to store ———————————————
+     *  • If the client included the field (even if blank) use that.
+     *  • If the field is missing entirely, fall back to the pencil’s text. */
+    const menuDescProvided = Object.prototype.hasOwnProperty.call(
+      req.body,
+      "menuDescription"
+    );
+    const menuDescFinal = menuDescProvided
+      ? (menuDescription || "").trim() // may be intentionally empty
+      : pencil.menuDescription; // copy from pencil when key absent
+
     /* 6️⃣  Conflict checks */
     const conflictMsg = await hasConflict({
       date,
@@ -266,7 +277,7 @@ export const convertPencilBooking = async (req, res) => {
       ballrooms,
       customerInfo,
       foodMenu,
-      menuDescription,
+      menuDescription: menuDescFinal,
       foodMenuCost,
       indicativePricing,
       discount,
