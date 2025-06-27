@@ -225,6 +225,10 @@ export const updateBooking = async (req, res) => {
     if (req.body.ballrooms) booking.ballrooms = req.body.ballrooms; // array
     if (req.body.foodMenu) booking.foodMenu = req.body.foodMenu;
     if (req.body.foodMenuCost) booking.foodMenuCost = req.body.foodMenuCost;
+    /* ── menu description (allow blank to clear) ───────────────────── */
+    if (Object.prototype.hasOwnProperty.call(req.body, "menuDescription")) {
+      booking.menuDescription = req.body.menuDescription ?? "";
+    }
 
     if (req.body.indicativePricing !== undefined) {
       booking.indicativePricing = req.body.indicativePricing;
@@ -233,6 +237,30 @@ export const updateBooking = async (req, res) => {
     if (req.body.discount !== undefined) {
       booking.discount = req.body.discount;
       booking.approvedDiscount = false; // reset approval
+    }
+
+    /* ── custom time validation & update ───────────────────────────── */
+    if (req.body.customTime) {
+      const { start, end } = req.body.customTime;
+      const HHMM = /^([0-1]?\d|2[0-3]):[0-5]\d$/;
+      if (!HHMM.test(start) || !HHMM.test(end)) {
+        return res
+          .status(400)
+          .json({ message: "customTime must be in HH:mm 24-hour format." });
+      }
+      const diffMinutes = (a, b) => {
+        const [sH, sM] = a.split(":").map(Number);
+        const [eH, eM] = b.split(":").map(Number);
+        let d = eH * 60 + eM - (sH * 60 + sM);
+        if (d <= 0) d += 24 * 60;
+        return d;
+      };
+      if (diffMinutes(start, end) === 0) {
+        return res
+          .status(400)
+          .json({ message: "Start and end time cannot be the same." });
+      }
+      booking.customTime = { start, end }; // overwrite whole sub-doc
     }
 
     /* ─── 2. additionalCosts – merge, don’t overwrite ───────────────── */
