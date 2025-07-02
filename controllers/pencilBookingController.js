@@ -195,17 +195,22 @@ export const convertPencilBooking = async (req, res) => {
         .status(400)
         .json({ message: "Indicative pricing must be > 0." });
 
-    /* 3️⃣  Validate additionalCosts */
+    /* 3️⃣  Validate additionalCosts  (negatives = reductions) */
     for (const [i, c] of additionalCosts.entries()) {
       if (!c.type || c.amount == null)
         return res
           .status(400)
           .json({ message: `Line-item #${i + 1} is incomplete.` });
-      if (c.amount <= 0)
+
+      if (c.amount === 0)
+        // zero still forbidden
         return res
           .status(400)
-          .json({ message: `Line-item #${i + 1} amount must be > 0.` });
+          .json({ message: `Line-item #${i + 1} amount cannot be 0.` });
+
+      // positive = extra cost, negative = reduction → both accepted
     }
+
     const totalExtra = additionalCosts.reduce(
       (s, { amount = 0 }) => s + amount,
       0
