@@ -17,16 +17,22 @@ const calcDepositCollected = (rows = []) =>
  * call this after you push / splice any payment rows.
  */
 function recomputeFinancials(booking) {
-  /* ——— 1. invoice balance & over-payments ——— */
-  const invoiceTotal = booking.finalInvoice?.total ?? 0;
-  const paymentsTotal = calcSum(booking.advancePayments); // AP + PY rows
+  /* 1. invoice balance & over-payments (ONLY if an invoice exists) */
+  const hasInvoice = !!booking.finalInvoice;
+  const invoiceTotal = hasInvoice ? booking.finalInvoice.total : 0;
+  const paymentsTotal = calcSum(booking.advancePayments);
 
-  if (paymentsTotal >= invoiceTotal) {
-    booking.balanceDue = 0;
-    booking.invoiceOverpaid = paymentsTotal - invoiceTotal; // always ≥ 0
+  if (hasInvoice) {
+    if (paymentsTotal >= invoiceTotal) {
+      booking.balanceDue = 0;
+      booking.invoiceOverpaid = paymentsTotal - invoiceTotal;
+    } else {
+      booking.balanceDue = invoiceTotal - paymentsTotal;
+      booking.invoiceOverpaid = 0;
+    }
   } else {
-    booking.balanceDue = invoiceTotal - paymentsTotal; // > 0
-    booking.invoiceOverpaid = 0;
+    booking.balanceDue = 0;
+    booking.invoiceOverpaid = 0; // <── the key change
   }
 
   /* ——— 2. break the deposit ledger into parts ——— */
@@ -49,11 +55,12 @@ function recomputeFinancials(booking) {
   const due = booking.refundableDepositDue || 0;
   booking.refundableDepositOutstanding = Math.max(0, due - pos);
 
-  /* ——— 4. how much we still owe the customer ——— */
-  //  • invoiceOverpaid is *always* refundable immediately
-  //  • depositCollected only becomes refundable once the invoice is settled
+  /* 4. how much we still owe the customer */
+  const canRefundDeposit = hasInvoice && booking.balanceDue === 0;
+
   booking.refundDueToCustomer =
-    booking.invoiceOverpaid + (booking.balanceDue === 0 ? depositCollected : 0);
+    (hasInvoice ? booking.invoiceOverpaid : 0) +
+    (canRefundDeposit ? depositCollected : 0);
 
   /* ——— 5. expose helper numbers to the client ——— */
   booking.depositCollected = depositCollected;
