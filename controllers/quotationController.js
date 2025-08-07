@@ -128,14 +128,18 @@ export const createQuotation = async (req, res) => {
         .status(400)
         .json({ message: "indicativePricing must be ≥ 0." });
     for (const [i, line] of additionalCosts.entries()) {
-      if (!line.type || line.amount == null)
+      // ① type must be present
+      if (!line.type || !line.type.trim()) {
         return res
           .status(400)
-          .json({ message: `Line-item #${i + 1} is incomplete.` });
-      if (line.amount < 0)
+          .json({ message: `Line-item #${i + 1}: “type” is required.` });
+      }
+      // ② cost × qty must produce a *positive* number
+      if (line.amount == null || line.amount <= 0) {
         return res
           .status(400)
-          .json({ message: `Line-item #${i + 1} amount must be ≥ 0.` });
+          .json({ message: `Line-item #${i + 1}: amount must be > 0.` });
+      }
     }
 
     // 4) Generate serialNumber (e.g. “QT000123”)
@@ -283,14 +287,18 @@ export const updateQuotation = async (req, res) => {
         .status(400)
         .json({ message: "indicativePricing must be ≥ 0." });
     for (const [i, line] of additionalCosts.entries()) {
-      if (!line.type || line.amount == null)
+      // ① type must be present
+      if (!line.type || !line.type.trim()) {
         return res
           .status(400)
-          .json({ message: `Line-item #${i + 1} is incomplete.` });
-      if (line.amount < 0)
+          .json({ message: `Line-item #${i + 1}: “type” is required.` });
+      }
+      // ② cost × qty must produce a *positive* number
+      if (line.amount == null || line.amount <= 0) {
         return res
           .status(400)
-          .json({ message: `Line-item #${i + 1} amount must be ≥ 0.` });
+          .json({ message: `Line-item #${i + 1}: amount must be > 0.` });
+      }
     }
 
     // 5) Apply updates
