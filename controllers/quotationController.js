@@ -14,7 +14,7 @@ function durationMinutes(startHHMM, endHHMM) {
   return end - start; // always positive
 }
 
-const MAX_EVENT_MINUTES = 12 * 60; // 12h cap
+const MAX_EVENT_MINUTES = 18 * 60; // 12h cap
 
 /** exactly copied from pencil booking, plus one more check against existing quotations */
 async function hasQuotationConflict({
