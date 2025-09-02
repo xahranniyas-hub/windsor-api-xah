@@ -20,8 +20,17 @@ function recomputeFinancials(booking) {
   /* 1. invoice balance & over-payments (ONLY if an invoice exists) */
   const hasInvoice = !!booking.finalInvoice;
   const invoiceTotal = hasInvoice ? booking.finalInvoice.total : 0;
-  const paymentsTotal = calcSum(booking.advancePayments);
 
+  // Positive vs negative splits (so we can see unrefunded advances)
+  const advPos = (booking.advancePayments || [])
+    .filter((p) => p.amount > 0)
+    .reduce((s, p) => s + p.amount, 0);
+  const advNeg = (booking.advancePayments || [])
+    .filter((p) => p.amount < 0)
+    .reduce((s, p) => s + Math.abs(p.amount), 0);
+  const advanceUnrefunded = Math.max(0, advPos - advNeg);
+
+  const paymentsTotal = calcSum(booking.advancePayments);
   if (hasInvoice) {
     if (paymentsTotal >= invoiceTotal) {
       booking.balanceDue = 0;
@@ -51,16 +60,23 @@ function recomputeFinancials(booking) {
   const depositCollected = Math.max(0, pos - negDeposit - negRefund); // in hand
   const depositUsed = negDeposit; // applied
 
-  /* ——— 3. what is still to be collected ——— */
-  const due = booking.refundableDepositDue || 0;
+  booking.depositCollected = depositCollected;
+  booking.depositUsed = negDeposit;
+
+  // outstanding deposit to collect (zero out if cancelled)
+  const due =
+    booking.status === "cancelled" ? 0 : booking.refundableDepositDue || 0;
   booking.refundableDepositOutstanding = Math.max(0, due - pos);
 
   /* 4. how much we still owe the customer */
-  const canRefundDeposit = hasInvoice && booking.balanceDue === 0;
+  const canRefundDeposit =
+    (hasInvoice && booking.balanceDue === 0) || booking.status === "cancelled";
 
   booking.refundDueToCustomer =
     (hasInvoice ? booking.invoiceOverpaid : 0) +
-    (canRefundDeposit ? depositCollected : 0);
+    (canRefundDeposit ? depositCollected : 0) +
+    // ► If cancelled, allow refund of all unrefunded advances as well
+    (booking.status === "cancelled" ? advanceUnrefunded : 0);
 
   /* ——— 5. expose helper numbers to the client ——— */
   booking.depositCollected = depositCollected;
@@ -71,6 +87,80 @@ function recomputeFinancials(booking) {
     booking.finalInvoice.status = booking.balanceDue === 0 ? "Settled" : "Open";
   }
 }
+
+// controllers/bookingController.js
+export const cancelBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const booking = await Booking.findById(id);
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+    if (booking.status !== "confirmed") {
+      return res
+        .status(400)
+        .json({ message: "Only confirmed bookings can be cancelled." });
+    }
+
+    booking.status = "cancelled";
+    booking.cancelledAt = new Date();
+    booking.cancellationReason = reason || "Cancelled by user";
+    booking.refundableDepositDue = 0; // stop collecting remaining deposit
+
+    recomputeFinancials(booking);
+    await booking.save();
+
+    return res.json({ message: "Booking cancelled", booking });
+  } catch (err) {
+    return res.status(400).json({ message: err.message });
+  }
+};
+
+// controllers/bookingController.js
+export const refundAdvance = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount, date, reference, description, mode } = req.body;
+
+    if (!(amount > 0)) throw new Error("Amount must be greater than zero");
+
+    const booking = await Booking.findById(id);
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+    // how much of advances are still unrefunded?
+    const pos = (booking.advancePayments || [])
+      .filter((p) => p.amount > 0 && p.mode !== "deposit") // exclude PY deposit moves
+      .reduce((s, p) => s + p.amount, 0);
+    const neg = (booking.advancePayments || [])
+      .filter((p) => p.amount < 0)
+      .reduce((s, p) => s + Math.abs(p.amount), 0);
+    const available = Math.max(0, pos - neg);
+
+    if (amount > available) {
+      throw new Error(
+        `Refund exceeds unrefunded advance total (max ${available.toFixed(2)})`
+      );
+    }
+
+    const seq = await getNextSequenceValue("refundDeposits"); // reuse your seq generator
+    booking.advancePayments.push({
+      date: date ? new Date(date) : new Date(),
+      serialNumber: `RF${String(seq).padStart(6, "0")}`,
+      reference: reference || "cancelled",
+      description: description || "Refund – advance payment",
+      mode: mode || "cash",
+      amount: -amount, // negative = cash out
+    });
+
+    recomputeFinancials(booking);
+    await booking.save();
+
+    return res.json(booking);
+  } catch (err) {
+    return res.status(400).json({ message: err.message });
+  }
+};
 
 /* ─────────────────────────────────────────  READS ── */
 export const getAllBookings = async (req, res) => {
@@ -159,9 +249,22 @@ export const receivePayment = async (req, res) => {
 
     const booking = await Booking.findById(id);
     if (!booking) throw new Error("Booking not found");
+    if (booking.status === "cancelled")
+      throw new Error("Cannot receive payment on a cancelled booking.");
 
     /* guard: cannot apply deposit that hasn’t been collected yet */
-    const pool = calcDepositCollected(booking.refundableDepositPayments);
+    // recompute net pool (or call recomputeFinancials first)
+    const pos = (booking.refundableDepositPayments || [])
+      .filter((p) => p.amount > 0)
+      .reduce((s, p) => s + p.amount, 0);
+    const negDeposit = (booking.refundableDepositPayments || [])
+      .filter((p) => p.amount < 0 && p.mode === "deposit")
+      .reduce((s, p) => s + Math.abs(p.amount), 0);
+    const negRefund = (booking.refundableDepositPayments || [])
+      .filter((p) => p.amount < 0 && p.mode !== "deposit")
+      .reduce((s, p) => s + Math.abs(p.amount), 0);
+    const pool = Math.max(0, pos - negDeposit - negRefund);
+
     if (depositApplied > pool)
       throw new Error(
         `Cannot apply Rs ${depositApplied.toFixed(2)}; only Rs ${pool.toFixed(
@@ -429,12 +532,35 @@ export const refundDeposit = async (req, res) => {
     if (!booking) return res.status(404).json({ message: "Booking not found" });
 
     /* ---------- validations ---------- */
-    const refundDue = booking.refundDueToCustomer ?? 0;
     if (amount <= 0) throw new Error("Amount must be greater than zero");
-    if (amount > refundDue)
+
+    // Recompute pools
+    const hasInvoice = !!booking.finalInvoice;
+    const canRefundDeposit =
+      (hasInvoice && booking.balanceDue === 0) ||
+      booking.status === "cancelled";
+
+    // depositCollected (net)
+    const pos = (booking.refundableDepositPayments || [])
+      .filter((p) => p.amount > 0)
+      .reduce((s, p) => s + p.amount, 0);
+    const negDeposit = (booking.refundableDepositPayments || [])
+      .filter((p) => p.amount < 0 && p.mode === "deposit")
+      .reduce((s, p) => s + Math.abs(p.amount), 0);
+    const negRefund = (booking.refundableDepositPayments || [])
+      .filter((p) => p.amount < 0 && p.mode !== "deposit")
+      .reduce((s, p) => s + Math.abs(p.amount), 0);
+    const depositCollected = Math.max(0, pos - negDeposit - negRefund);
+
+    const maxFromOverpay = Math.max(0, booking.invoiceOverpaid || 0);
+    const maxFromDeposit = canRefundDeposit ? depositCollected : 0;
+
+    const hardCap = maxFromOverpay + maxFromDeposit;
+    if (amount > hardCap) {
       throw new Error(
-        `Refund exceeds deposit remaining (max ${refundDue.toFixed(2)})`
+        `Refund exceeds refundable deposit/overpay (max ${hardCap.toFixed(2)})`
       );
+    }
 
     /* ---------- allocate refund ---------- */
     let remaining = amount;

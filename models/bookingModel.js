@@ -240,6 +240,8 @@ const BookingSchema = new Schema(
         default: "pending",
       },
     },
+    cancelledAt: { type: Date },
+    cancellationReason: { type: String, trim: true, maxlength: 1000 },
   },
   { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );

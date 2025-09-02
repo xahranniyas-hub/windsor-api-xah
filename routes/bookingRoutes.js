@@ -14,6 +14,8 @@ import {
   deletePayment,
   updatePayment,
   emailBookingPdf,
+  cancelBooking,
+  refundAdvance,
 } from "../controllers/bookingController.js";
 import { protect, authorizeRole } from "../middleware/authMiddleware.js";
 
@@ -119,6 +121,22 @@ router.post(
     }
     return emailBookingPdf(req, res);
   }
+);
+
+// Cancel booking
+router.patch(
+  "/:id/cancel",
+  protect,
+  authorizeRole(["admin", "editor"]),
+  cancelBooking
+);
+
+// Refund advance payments (optional helper)
+router.post(
+  "/:id/refund-advance",
+  protect,
+  authorizeRole(["admin", "editor"]),
+  refundAdvance
 );
 
 export default router;
