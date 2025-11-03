@@ -16,6 +16,32 @@ const calcDepositCollected = (rows = []) =>
  * (re)computes: balanceDue ‖ refundDueToCustomer ‖ finalInvoice.status
  * call this after you push / splice any payment rows.
  */
+
+function setRefundableDepositDue(booking, nextDueRaw) {
+  const nextDue = Math.max(0, Number(nextDueRaw) || 0);
+
+  // how much deposit has already been APPLIED to the invoice (cannot undo with just a "due" change)
+  const alreadyApplied = (booking.refundableDepositPayments || [])
+    .filter((p) => p.amount < 0 && p.mode === "deposit")
+    .reduce((s, p) => s + Math.abs(p.amount), 0);
+
+  if (nextDue < alreadyApplied) {
+    // hard stop: you can't set "due" lower than what was already used against the invoice
+    throw new Error(
+      `New deposit due (Rs ${nextDue.toFixed(
+        2
+      )}) is less than the amount already applied to the invoice (Rs ${alreadyApplied.toFixed(
+        2
+      )}).`
+    );
+  }
+
+  booking.refundableDepositDue = nextDue;
+
+  // NOTE: outstanding is recomputed inside recomputeFinancials()
+  // based on (due - collected positives)
+}
+
 function recomputeFinancials(booking) {
   /* 1. invoice balance & over-payments (ONLY if an invoice exists) */
   const hasInvoice = !!booking.finalInvoice;
@@ -338,6 +364,13 @@ export const updateBooking = async (req, res) => {
     /* ── menu description (allow blank to clear) ───────────────────── */
     if (Object.prototype.hasOwnProperty.call(req.body, "menuDescription")) {
       booking.menuDescription = req.body.menuDescription ?? "";
+    }
+
+    // inside updateBooking controller, after simple field updates
+    if (
+      Object.prototype.hasOwnProperty.call(req.body, "refundableDepositDue")
+    ) {
+      setRefundableDepositDue(booking, req.body.refundableDepositDue);
     }
 
     if (req.body.indicativePricing !== undefined) {
@@ -905,5 +938,35 @@ export const emailBookingPdf = async (req, res) => {
     return res
       .status(500)
       .json({ message: "Server error sending email.", error: err.message });
+  }
+};
+
+// PATCH /api/bookings/:id/deposit-due
+export const updateDepositDue = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { refundableDepositDue } = req.body;
+
+    const booking = await Booking.findById(id);
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+    if (booking.status === "cancelled") {
+      // For cancelled bookings we force 0 (your cancel flow already sets it to 0)
+      booking.refundableDepositDue = 0;
+    } else {
+      setRefundableDepositDue(booking, refundableDepositDue);
+    }
+
+    // Recompute aggregates so: refundableDepositOutstanding, depositCollected/Used,
+    // refundDueToCustomer, invoiceOverpaid/balanceDue are in sync.
+    recomputeFinancials(booking);
+    await booking.save();
+
+    return res.json({
+      message: "Refundable deposit updated",
+      booking,
+    });
+  } catch (err) {
+    return res.status(400).json({ message: err.message });
   }
 };

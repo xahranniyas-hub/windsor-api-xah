@@ -16,6 +16,7 @@ import {
   emailBookingPdf,
   cancelBooking,
   refundAdvance,
+  updateDepositDue,
 } from "../controllers/bookingController.js";
 import { protect, authorizeRole } from "../middleware/authMiddleware.js";
 
@@ -137,6 +138,13 @@ router.post(
   protect,
   authorizeRole(["admin", "editor"]),
   refundAdvance
+);
+
+router.patch(
+  "/:id/deposit-due",
+  protect,
+  authorizeRole(["admin", "editor"]),
+  updateDepositDue
 );
 
 export default router;
