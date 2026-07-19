@@ -17,7 +17,7 @@ dotenv.config();
 
 const port = process.env.PORT;
 
-// job.start();
+job.start();
 app.use(cors());
 
 // Connect to MongoDB
