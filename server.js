@@ -12,6 +12,8 @@ import memoRoutes from "./routes/memoRoutes.js";
 import termsRoutes from "./routes/termsRoutes.js";
 import quotationRoutes from "./routes/quotationRoutes.js";
 
+import invoiceExtractionRoutes from "./routes/invoiceExtractionRoutes.js";
+
 const app = express();
 dotenv.config();
 
@@ -30,6 +32,7 @@ app.use(express.json());
 app.get("/", (req, res) => res.send("Hello World!"));
 
 // Mount routes
+app.use("/api/invoice-extractions", invoiceExtractionRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/pencil-bookings", pencilBookingRoutes);
 app.use("/api/bookings", bookingRoutes);
