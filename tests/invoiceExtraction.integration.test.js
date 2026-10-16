@@ -32,32 +32,34 @@ test("extraction API: authorization, snapshots, retries, concurrency and rollbac
     const payload = (ids = bookings.map((b) => String(b._id))) => ({ name: "Oct–Mar", from: "2026-10-01", to: "2027-03-31", bookingIds: ids, requestId: randomUUID() });
     assert.equal((await call("GET", "", null, null)).status, 401);
     assert.equal((await call("GET", "", null, jwt.sign({ id: String(viewerId) }, process.env.JWT_SECRET))).status, 403);
+    // Legacy EXT counter must not affect the new INV start.
+    await ExtractionSequence.create({ _id: "handover", seq: 87 });
     const request = payload();
     const first = await call("POST", "", request);
     assert.equal(first.status, 201, JSON.stringify(first.body));
-    assert.deepEqual(first.body.entries.map((e) => e.reference), ["EXT000001", "EXT000002", "EXT000003"]);
+    assert.deepEqual(first.body.entries.map((e) => e.reference), ["INV000240", "INV000241", "INV000242"]);
     assert.equal(first.body.entries[0].booking.internalNotes, undefined);
     assert.equal((await call("POST", "", request)).body._id, first.body._id);
     assert.equal((await call("POST", "", { ...request, name: "changed" })).status, 409);
     await Booking.collection.updateOne({ _id: bookings[0]._id }, { $set: { "finalInvoice.total": 9999 } });
     assert.equal((await call("GET", `/${request.requestId}`)).body.entries[0].booking.finalInvoice.total, 510);
-    const before = (await ExtractionSequence.findById("handover")).seq;
+    const before = (await ExtractionSequence.findById("handover-inv")).seq;
     assert.equal((await call("POST", "", payload([String(new mongoose.Types.ObjectId())]))).status, 409);
     assert.equal((await call("POST", "", { ...payload(), from: "2027-01-01" })).status, 409);
-    assert.equal((await ExtractionSequence.findById("handover")).seq, before);
+    assert.equal((await ExtractionSequence.findById("handover-inv")).seq, before);
     const retry = payload([String(bookings[1]._id)]);
     const same = await Promise.all([call("POST", "", retry), call("POST", "", retry)]);
     assert.ok(same.every((result) => [200, 201].includes(result.status)), JSON.stringify(same));
     assert.equal(same[0].body.entries[0].reference, same[1].body.entries[0].reference);
     const parallel = await Promise.all([call("POST", "", payload([String(bookings[1]._id)])), call("POST", "", payload([String(bookings[2]._id)]))]);
     assert.ok(parallel.every((result) => result.status === 201), JSON.stringify(parallel));
-    assert.deepEqual(parallel.map((result) => result.body.firstNumber).sort(), [5, 6]);
+    assert.deepEqual(parallel.map((result) => result.body.firstNumber).sort(), [244, 245]);
     // Force a failure after counter allocation to verify transaction rollback.
     const originalCreate = Batch.create;
     Batch.create = async () => { throw new Error("Injected save failure"); };
     try { assert.equal((await call("POST", "", payload())).status, 500); }
     finally { Batch.create = originalCreate; }
-    assert.equal((await ExtractionSequence.findById("handover")).seq, 6);
+    assert.equal((await ExtractionSequence.findById("handover-inv")).seq, 245);
     assert.equal(await Batch.countDocuments(), 4);
     const listing = await call("GET");
     assert.equal(listing.body.batches.length, 4);

@@ -1,5 +1,7 @@
 // Pure helpers shared by the extraction controller and its tests.
 export const MAX_EXTRACTION_SIZE = 300;
+export const EXTRACTION_START = 240;
+export const EXTRACTION_SEQUENCE_ID = "handover-inv";
 export function dateRange(from, to) {
   const parse = (value) => {
     if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error("Choose valid From and To dates.");
@@ -21,7 +23,7 @@ export function makeEntries(bookings, firstNumber) {
   const fields = ["_id", "serialNumber", "customerInfo", "ballrooms", "ballroom", "guestsCount", "date", "foodMenu", "foodMenuCost", "indicativePricing", "additionalCosts", "advancePayments", "refundableDepositPayments", "refundableDepositDue", "balanceDue", "invoiceOverpaid", "finalInvoice", "status"];
   return sortInvoices(bookings).map((booking, index) => ({
     bookingId: booking._id,
-    reference: `EXT${String(firstNumber + index).padStart(6, "0")}`,
+    reference: `INV${String(firstNumber + index).padStart(6, "0")}`,
     booking: Object.fromEntries(fields.filter((key) => booking[key] !== undefined).map((key) => [key, booking[key]])),
   }));
 }

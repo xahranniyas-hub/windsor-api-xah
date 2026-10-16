@@ -1,0 +1,1178 @@
+{
+  "database": "windsor-db",
+  "backedUpAt": {
+    "$date": {
+      "$numberLong": "1792139902055"
+    }
+  },
+  "batches": [
+    {
+      "_id": "a1744da1-e591-4e76-9b49-ce2f17c4b48e",
+      "name": "september i",
+      "from": "2026-09-01",
+      "to": "2026-09-30",
+      "fingerprint": "31d80953408c0440fa76ab6977f7dcaed3ce88559c005072768a40079a27294e",
+      "createdBy": {
+        "$oid": "683a9e8b4b6eecf5a6a9a954"
+      },
+      "firstNumber": {
+        "$numberInt": "1"
+      },
+      "lastNumber": {
+        "$numberInt": "7"
+      },
+      "count": {
+        "$numberInt": "7"
+      },
+      "total": {
+        "$numberInt": "8520500"
+      },
+      "entries": [
+        {
+          "bookingId": {
+            "$oid": "69e06e7d69aea759cee748bd"
+          },
+          "reference": "EXT000001",
+          "booking": {
+            "_id": {
+              "$oid": "69e06e7d69aea759cee748bd"
+            },
+            "serialNumber": "BK000266",
+            "customerInfo": {
+              "name": "Mr Manoj Balasubramaniam ",
+              "phone": "0755756798",
+              "email": "",
+              "NIC": "",
+              "address": "No 15, 5th floor D unit , mihijayasewana - colombo 15"
+            },
+            "ballrooms": [
+              {
+                "name": "Grand",
+                "guests": {
+                  "$numberInt": "200"
+                }
+              }
+            ],
+            "date": {
+              "$date": {
+                "$numberLong": "1788307200000"
+              }
+            },
+            "foodMenu": "A1_Full",
+            "foodMenuCost": {
+              "$numberInt": "4450"
+            },
+            "indicativePricing": {
+              "$numberInt": "890000"
+            },
+            "additionalCosts": [],
+            "advancePayments": [
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1775779200000"
+                  }
+                },
+                "serialNumber": "AP000670",
+                "reference": "854885",
+                "description": "1st payment -sampath bank",
+                "mode": "bank transfer",
+                "amount": {
+                  "$numberInt": "150000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1788048000000"
+                  }
+                },
+                "serialNumber": "AP000895",
+                "reference": "468861",
+                "description": "2nd Payment",
+                "mode": "cash",
+                "amount": {
+                  "$numberInt": "740000"
+                }
+              }
+            ],
+            "refundableDepositPayments": [
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1788048000000"
+                  }
+                },
+                "serialNumber": "DP000895",
+                "reference": "468861",
+                "description": "2nd Payment",
+                "mode": "cash",
+                "amount": {
+                  "$numberInt": "100000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1788912000000"
+                  }
+                },
+                "serialNumber": "RF000233",
+                "reference": "000452",
+                "description": "Refund – refundable deposit",
+                "mode": "cheque",
+                "amount": {
+                  "$numberInt": "-100000"
+                }
+              }
+            ],
+            "refundableDepositDue": {
+              "$numberInt": "100000"
+            },
+            "balanceDue": {
+              "$numberInt": "0"
+            },
+            "invoiceOverpaid": {
+              "$numberInt": "0"
+            },
+            "finalInvoice": {
+              "invoiceNumber": "IN000240",
+              "dateIssued": {
+                "$date": {
+                  "$numberLong": "1788759194085"
+                }
+              },
+              "subtotal": {
+                "$numberInt": "890000"
+              },
+              "vat": {
+                "$numberInt": "0"
+              },
+              "total": {
+                "$numberInt": "890000"
+              },
+              "_id": {
+                "$oid": "6a9e4c9a5306e3a367c6c515"
+              }
+            },
+            "status": "completed"
+          }
+        },
+        {
+          "bookingId": {
+            "$oid": "69143226bc6535a1ae08a375"
+          },
+          "reference": "EXT000002",
+          "booking": {
+            "_id": {
+              "$oid": "69143226bc6535a1ae08a375"
+            },
+            "serialNumber": "BK000181",
+            "customerInfo": {
+              "name": "P.Mohan",
+              "phone": "0720655127",
+              "email": "",
+              "NIC": "",
+              "address": "No. 160/5/6, Justik Akbar Mawatha, Colombo 02"
+            },
+            "ballrooms": [
+              {
+                "name": "Grand",
+                "guests": {
+                  "$numberInt": "350"
+                }
+              }
+            ],
+            "date": {
+              "$date": {
+                "$numberLong": "1788566400000"
+              }
+            },
+            "foodMenu": "Silver_Half",
+            "foodMenuCost": {
+              "$numberInt": "4800"
+            },
+            "indicativePricing": {
+              "$numberInt": "1680000"
+            },
+            "additionalCosts": [
+              {
+                "type": "Other",
+                "description": "bar charge",
+                "cost": {
+                  "$numberInt": "1"
+                },
+                "quantity": {
+                  "$numberInt": "10000"
+                },
+                "amount": {
+                  "$numberInt": "10000"
+                },
+                "editable": false
+              }
+            ],
+            "advancePayments": [
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1762905600000"
+                  }
+                },
+                "serialNumber": "AP000377",
+                "reference": "778380",
+                "description": "1st payment",
+                "mode": "cash",
+                "amount": {
+                  "$numberInt": "100000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1786752000000"
+                  }
+                },
+                "serialNumber": "AP000873",
+                "reference": "909516",
+                "description": "2nd Payment",
+                "mode": "cash",
+                "amount": {
+                  "$numberInt": "767000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1787875200000"
+                  }
+                },
+                "serialNumber": "AP000892",
+                "reference": "568455",
+                "description": "3rd Payment - Sampath Bank",
+                "mode": "bank transfer",
+                "amount": {
+                  "$numberInt": "823000"
+                }
+              }
+            ],
+            "refundableDepositPayments": [
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1786752000000"
+                  }
+                },
+                "serialNumber": "DP000873",
+                "reference": "909516",
+                "description": "2nd Payment",
+                "mode": "cash",
+                "amount": {
+                  "$numberInt": "100000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1792454400000"
+                  }
+                },
+                "serialNumber": "RF000234",
+                "reference": "000456",
+                "description": "Refund – refundable deposit",
+                "mode": "cheque",
+                "amount": {
+                  "$numberInt": "-100000"
+                }
+              }
+            ],
+            "refundableDepositDue": {
+              "$numberInt": "100000"
+            },
+            "balanceDue": {
+              "$numberInt": "0"
+            },
+            "invoiceOverpaid": {
+              "$numberInt": "0"
+            },
+            "finalInvoice": {
+              "invoiceNumber": "IN000241",
+              "dateIssued": {
+                "$date": {
+                  "$numberLong": "1788759207013"
+                }
+              },
+              "subtotal": {
+                "$numberInt": "1690000"
+              },
+              "vat": {
+                "$numberInt": "0"
+              },
+              "total": {
+                "$numberInt": "1690000"
+              },
+              "_id": {
+                "$oid": "6a9e4ca75306e3a367c6c51c"
+              }
+            },
+            "status": "completed"
+          }
+        },
+        {
+          "bookingId": {
+            "$oid": "6a3cbcdc54af65592060421a"
+          },
+          "reference": "EXT000003",
+          "booking": {
+            "_id": {
+              "$oid": "6a3cbcdc54af65592060421a"
+            },
+            "serialNumber": "BK000298",
+            "customerInfo": {
+              "name": "Mr Mohamed Rinshard",
+              "phone": "0772690712",
+              "email": "",
+              "NIC": "",
+              "address": "275/14/L megoda Kolonnawa wellampitiya"
+            },
+            "ballrooms": [
+              {
+                "name": "Grand",
+                "guests": {
+                  "$numberInt": "275"
+                }
+              }
+            ],
+            "date": {
+              "$date": {
+                "$numberLong": "1788652800000"
+              }
+            },
+            "foodMenu": "Hall_Only",
+            "foodMenuCost": {
+              "$numberInt": "2400"
+            },
+            "indicativePricing": {
+              "$numberInt": "660000"
+            },
+            "additionalCosts": [
+              {
+                "type": "Coffee",
+                "description": "",
+                "cost": {
+                  "$numberInt": "100"
+                },
+                "quantity": {
+                  "$numberInt": "125"
+                },
+                "amount": {
+                  "$numberInt": "12500"
+                },
+                "editable": true
+              }
+            ],
+            "advancePayments": [
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1782345600000"
+                  }
+                },
+                "serialNumber": "AP000767",
+                "reference": "702530",
+                "description": "1st payment-sampath bank",
+                "mode": "bank transfer",
+                "amount": {
+                  "$numberInt": "100000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1788307200000"
+                  }
+                },
+                "serialNumber": "AP000897",
+                "reference": "970853",
+                "description": "2nd Payment - Sampath Bank",
+                "mode": "bank transfer",
+                "amount": {
+                  "$numberInt": "150000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1788393600000"
+                  }
+                },
+                "serialNumber": "AP000898",
+                "reference": "487808",
+                "description": "3rd Payment - Sampath Bank",
+                "mode": "bank transfer",
+                "amount": {
+                  "$numberInt": "410000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1788759249389"
+                  }
+                },
+                "serialNumber": "PY000903",
+                "reference": "deposit-used",
+                "description": "Refundable deposit applied against invoice",
+                "mode": "deposit",
+                "amount": {
+                  "$numberInt": "12500"
+                }
+              }
+            ],
+            "refundableDepositPayments": [
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1788307200000"
+                  }
+                },
+                "serialNumber": "DP000897",
+                "reference": "970853",
+                "description": "2nd Payment - Sampath Bank",
+                "mode": "bank transfer",
+                "amount": {
+                  "$numberInt": "150000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1788759249390"
+                  }
+                },
+                "serialNumber": "DP000903",
+                "reference": "deposit-used",
+                "description": "Deposit applied to invoice",
+                "mode": "deposit",
+                "amount": {
+                  "$numberInt": "-12500"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1790899200000"
+                  }
+                },
+                "serialNumber": "RF000235",
+                "reference": "000457",
+                "description": "Refund – refundable deposit",
+                "mode": "cheque",
+                "amount": {
+                  "$numberInt": "-137500"
+                }
+              }
+            ],
+            "refundableDepositDue": {
+              "$numberInt": "150000"
+            },
+            "balanceDue": {
+              "$numberInt": "0"
+            },
+            "invoiceOverpaid": {
+              "$numberInt": "0"
+            },
+            "finalInvoice": {
+              "invoiceNumber": "IN000242",
+              "dateIssued": {
+                "$date": {
+                  "$numberLong": "1788759238068"
+                }
+              },
+              "subtotal": {
+                "$numberInt": "672500"
+              },
+              "vat": {
+                "$numberInt": "0"
+              },
+              "total": {
+                "$numberInt": "672500"
+              },
+              "_id": {
+                "$oid": "6a9e4cc65306e3a367c6c523"
+              }
+            },
+            "status": "completed"
+          }
+        },
+        {
+          "bookingId": {
+            "$oid": "6a4e0d6654af655920604897"
+          },
+          "reference": "EXT000004",
+          "booking": {
+            "_id": {
+              "$oid": "6a4e0d6654af655920604897"
+            },
+            "serialNumber": "BK000309",
+            "customerInfo": {
+              "name": "Presbyterian Girls School PPA",
+              "phone": "0777222989",
+              "email": "",
+              "NIC": "",
+              "address": "dehiwala"
+            },
+            "ballrooms": [
+              {
+                "name": "Royal",
+                "guests": {
+                  "$numberInt": "270"
+                }
+              }
+            ],
+            "date": {
+              "$date": {
+                "$numberLong": "1789776000000"
+              }
+            },
+            "foodMenu": "A4_Half",
+            "foodMenuCost": {
+              "$numberInt": "4000"
+            },
+            "indicativePricing": {
+              "$numberInt": "1080000"
+            },
+            "additionalCosts": [
+              {
+                "type": "Additional Guests",
+                "description": "",
+                "cost": {
+                  "$numberInt": "4000"
+                },
+                "quantity": {
+                  "$numberInt": "25"
+                },
+                "amount": {
+                  "$numberInt": "100000"
+                },
+                "editable": true
+              }
+            ],
+            "advancePayments": [
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1783468800000"
+                  }
+                },
+                "serialNumber": "AP000796",
+                "reference": "259084",
+                "description": "1st payment- cheque 068578",
+                "mode": "cheque",
+                "amount": {
+                  "$numberInt": "100000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1789689600000"
+                  }
+                },
+                "serialNumber": "AP000917",
+                "reference": "860103",
+                "description": "2nd Payment-068581",
+                "mode": "cheque",
+                "amount": {
+                  "$numberInt": "900000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1789776000000"
+                  }
+                },
+                "serialNumber": "AP000919",
+                "reference": "523065",
+                "description": "3rd Payment",
+                "mode": "cash",
+                "amount": {
+                  "$numberInt": "80000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1789842850726"
+                  }
+                },
+                "serialNumber": "PY000920",
+                "reference": "deposit-used",
+                "description": "Refundable deposit applied against invoice",
+                "mode": "deposit",
+                "amount": {
+                  "$numberInt": "100000"
+                }
+              }
+            ],
+            "refundableDepositPayments": [
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1789689600000"
+                  }
+                },
+                "serialNumber": "DP000917",
+                "reference": "860103",
+                "description": "2nd Payment-068581",
+                "mode": "cheque",
+                "amount": {
+                  "$numberInt": "100000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1789842850727"
+                  }
+                },
+                "serialNumber": "DP000920",
+                "reference": "deposit-used",
+                "description": "Deposit applied to invoice",
+                "mode": "deposit",
+                "amount": {
+                  "$numberInt": "-100000"
+                }
+              }
+            ],
+            "refundableDepositDue": {
+              "$numberInt": "100000"
+            },
+            "balanceDue": {
+              "$numberInt": "0"
+            },
+            "invoiceOverpaid": {
+              "$numberInt": "0"
+            },
+            "finalInvoice": {
+              "invoiceNumber": "IN000244",
+              "dateIssued": {
+                "$date": {
+                  "$numberLong": "1789842832525"
+                }
+              },
+              "subtotal": {
+                "$numberInt": "1180000"
+              },
+              "vat": {
+                "$numberInt": "0"
+              },
+              "total": {
+                "$numberInt": "1180000"
+              },
+              "_id": {
+                "$oid": "6aaed5905306e3a367c6c99b"
+              }
+            },
+            "status": "completed"
+          }
+        },
+        {
+          "bookingId": {
+            "$oid": "68d7cbb24e696a2125d08520"
+          },
+          "reference": "EXT000005",
+          "booking": {
+            "_id": {
+              "$oid": "68d7cbb24e696a2125d08520"
+            },
+            "serialNumber": "BK000140",
+            "customerInfo": {
+              "name": "Ahamed Riyaz Shafeek",
+              "phone": "0766612341",
+              "email": "",
+              "NIC": "",
+              "address": "42/22, Pallidora Road, Kawdana, Dehiwala"
+            },
+            "ballrooms": [
+              {
+                "name": "Grand",
+                "guests": {
+                  "$numberInt": "300"
+                }
+              },
+              {
+                "name": "Diamond",
+                "guests": {
+                  "$numberInt": "300"
+                }
+              }
+            ],
+            "date": {
+              "$date": {
+                "$numberLong": "1789776000000"
+              }
+            },
+            "foodMenu": "Hall_Only",
+            "foodMenuCost": {
+              "$numberInt": "2150"
+            },
+            "indicativePricing": {
+              "$numberInt": "1290000"
+            },
+            "additionalCosts": [
+              {
+                "type": "Coffee",
+                "description": "",
+                "cost": {
+                  "$numberInt": "100"
+                },
+                "quantity": {
+                  "$numberInt": "150"
+                },
+                "amount": {
+                  "$numberInt": "15000"
+                },
+                "editable": true
+              }
+            ],
+            "advancePayments": [
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1758931200000"
+                  }
+                },
+                "serialNumber": "AP000284",
+                "reference": "175980",
+                "description": "1st Payment",
+                "mode": "cash",
+                "amount": {
+                  "$numberInt": "100000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1788566400000"
+                  }
+                },
+                "serialNumber": "AP000902",
+                "reference": "767205",
+                "description": "2nd Payment - Sampath Bank",
+                "mode": "bank transfer",
+                "amount": {
+                  "$numberInt": "850000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1788739200000"
+                  }
+                },
+                "serialNumber": "AP000904",
+                "reference": "448050",
+                "description": "3rd Payment - Sampath Bank",
+                "mode": "bank transfer",
+                "amount": {
+                  "$numberInt": "340000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1789891242884"
+                  }
+                },
+                "serialNumber": "PY000921",
+                "reference": "deposit-used",
+                "description": "Refundable deposit applied against invoice",
+                "mode": "deposit",
+                "amount": {
+                  "$numberInt": "15000"
+                }
+              }
+            ],
+            "refundableDepositPayments": [
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1788566400000"
+                  }
+                },
+                "serialNumber": "DP000902",
+                "reference": "767205",
+                "description": "2nd Payment - Sampath Bank",
+                "mode": "bank transfer",
+                "amount": {
+                  "$numberInt": "150000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1789891242885"
+                  }
+                },
+                "serialNumber": "DP000921",
+                "reference": "deposit-used",
+                "description": "Deposit applied to invoice",
+                "mode": "deposit",
+                "amount": {
+                  "$numberInt": "-15000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1789948800000"
+                  }
+                },
+                "serialNumber": "RF000238",
+                "reference": "000464",
+                "description": "Refund – refundable deposit",
+                "mode": "cheque",
+                "amount": {
+                  "$numberInt": "-135000"
+                }
+              }
+            ],
+            "refundableDepositDue": {
+              "$numberInt": "150000"
+            },
+            "balanceDue": {
+              "$numberInt": "0"
+            },
+            "invoiceOverpaid": {
+              "$numberInt": "0"
+            },
+            "finalInvoice": {
+              "invoiceNumber": "IN000245",
+              "dateIssued": {
+                "$date": {
+                  "$numberLong": "1789891228981"
+                }
+              },
+              "subtotal": {
+                "$numberInt": "1305000"
+              },
+              "vat": {
+                "$numberInt": "0"
+              },
+              "total": {
+                "$numberInt": "1305000"
+              },
+              "_id": {
+                "$oid": "6aaf929c5306e3a367c6c9cd"
+              }
+            },
+            "status": "completed"
+          }
+        },
+        {
+          "bookingId": {
+            "$oid": "6a155c0f69aea759cee75616"
+          },
+          "reference": "EXT000006",
+          "booking": {
+            "_id": {
+              "$oid": "6a155c0f69aea759cee75616"
+            },
+            "serialNumber": "BK000284",
+            "customerInfo": {
+              "name": "Mr Aasif",
+              "phone": "0758884542",
+              "email": "",
+              "NIC": "",
+              "address": "colombo"
+            },
+            "ballrooms": [
+              {
+                "name": "Diamond",
+                "guests": {
+                  "$numberInt": "280"
+                }
+              }
+            ],
+            "date": {
+              "$date": {
+                "$numberLong": "1790380800000"
+              }
+            },
+            "foodMenu": "Mutton_Biriyani",
+            "foodMenuCost": {
+              "$numberInt": "4600"
+            },
+            "indicativePricing": {
+              "$numberInt": "1288000"
+            },
+            "additionalCosts": [
+              {
+                "type": "Coffee",
+                "description": "",
+                "cost": {
+                  "$numberInt": "100"
+                },
+                "quantity": {
+                  "$numberInt": "150"
+                },
+                "amount": {
+                  "$numberInt": "15000"
+                },
+                "editable": false
+              }
+            ],
+            "advancePayments": [
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1779753600000"
+                  }
+                },
+                "serialNumber": "AP000723",
+                "reference": "927556",
+                "description": "1st payment-sampath bank",
+                "mode": "bank transfer",
+                "amount": {
+                  "$numberInt": "150000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1789430400000"
+                  }
+                },
+                "serialNumber": "AP000915",
+                "reference": "749381",
+                "description": "2nd Payment",
+                "mode": "cash",
+                "amount": {
+                  "$numberInt": "1153000"
+                }
+              }
+            ],
+            "refundableDepositPayments": [
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1789430400000"
+                  }
+                },
+                "serialNumber": "DP000915",
+                "reference": "749381",
+                "description": "2nd Payment",
+                "mode": "cash",
+                "amount": {
+                  "$numberInt": "150000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1790899200000"
+                  }
+                },
+                "serialNumber": "RF000237",
+                "reference": "000475",
+                "description": "Refund – refundable deposit",
+                "mode": "cheque",
+                "amount": {
+                  "$numberInt": "-150000"
+                }
+              }
+            ],
+            "refundableDepositDue": {
+              "$numberInt": "150000"
+            },
+            "balanceDue": {
+              "$numberInt": "0"
+            },
+            "invoiceOverpaid": {
+              "$numberInt": "0"
+            },
+            "finalInvoice": {
+              "invoiceNumber": "IN000246",
+              "dateIssued": {
+                "$date": {
+                  "$numberLong": "1790522786417"
+                }
+              },
+              "subtotal": {
+                "$numberInt": "1303000"
+              },
+              "vat": {
+                "$numberInt": "0"
+              },
+              "total": {
+                "$numberInt": "1303000"
+              },
+              "_id": {
+                "$oid": "6ab935a25306e3a367c6ccc3"
+              }
+            },
+            "status": "completed"
+          }
+        },
+        {
+          "bookingId": {
+            "$oid": "690ac736a320570b4a7b9339"
+          },
+          "reference": "EXT000007",
+          "booking": {
+            "_id": {
+              "$oid": "690ac736a320570b4a7b9339"
+            },
+            "serialNumber": "BK000175",
+            "customerInfo": {
+              "name": "Mrs Hajra Abdul Razak ",
+              "phone": "94777857219",
+              "email": "",
+              "NIC": "198084900935",
+              "address": "92, 3/3 Layards Road  Colombo 5"
+            },
+            "ballrooms": [
+              {
+                "name": "Grand",
+                "guests": {
+                  "$numberInt": "400"
+                }
+              }
+            ],
+            "date": {
+              "$date": {
+                "$numberLong": "1790380800000"
+              }
+            },
+            "foodMenu": "Chicken_Biriyani",
+            "foodMenuCost": {
+              "$numberInt": "3700"
+            },
+            "indicativePricing": {
+              "$numberInt": "1480000"
+            },
+            "additionalCosts": [],
+            "advancePayments": [
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1762214400000"
+                  }
+                },
+                "serialNumber": "AP000364",
+                "reference": "364115",
+                "description": "1st Payment",
+                "mode": "bank transfer",
+                "amount": {
+                  "$numberInt": "100000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1789084800000"
+                  }
+                },
+                "serialNumber": "AP000910",
+                "reference": "373995",
+                "description": "2nd Payment",
+                "mode": "cash",
+                "amount": {
+                  "$numberInt": "1350000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1789084800000"
+                  }
+                },
+                "serialNumber": "AP000911",
+                "reference": "504889",
+                "description": "3rd Payment - Sampath Bank",
+                "mode": "bank transfer",
+                "amount": {
+                  "$numberInt": "30000"
+                }
+              }
+            ],
+            "refundableDepositPayments": [
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1789084800000"
+                  }
+                },
+                "serialNumber": "DP000910",
+                "reference": "373995",
+                "description": "2nd Payment",
+                "mode": "cash",
+                "amount": {
+                  "$numberInt": "150000"
+                }
+              },
+              {
+                "date": {
+                  "$date": {
+                    "$numberLong": "1790812800000"
+                  }
+                },
+                "serialNumber": "RF000236",
+                "reference": "285346",
+                "description": "Refund – refundable deposit",
+                "mode": "cheque",
+                "amount": {
+                  "$numberInt": "-150000"
+                }
+              }
+            ],
+            "refundableDepositDue": {
+              "$numberInt": "150000"
+            },
+            "balanceDue": {
+              "$numberInt": "0"
+            },
+            "invoiceOverpaid": {
+              "$numberInt": "0"
+            },
+            "finalInvoice": {
+              "invoiceNumber": "IN000247",
+              "dateIssued": {
+                "$date": {
+                  "$numberLong": "1790522830596"
+                }
+              },
+              "subtotal": {
+                "$numberInt": "1480000"
+              },
+              "vat": {
+                "$numberInt": "0"
+              },
+              "total": {
+                "$numberInt": "1480000"
+              },
+              "_id": {
+                "$oid": "6ab935ce5306e3a367c6ccca"
+              }
+            },
+            "status": "completed"
+          }
+        }
+      ],
+      "createdAt": {
+        "$date": {
+          "$numberLong": "1791619267541"
+        }
+      }
+    }
+  ],
+  "counters": [
+    {
+      "_id": "handover",
+      "seq": {
+        "$numberInt": "7"
+      }
+    }
+  ]
+}

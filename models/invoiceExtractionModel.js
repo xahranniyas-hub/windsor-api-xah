@@ -4,6 +4,7 @@ const extractionSchema = new Schema({
   // Client-generated request key: built-in unique _id makes retries idempotent.
   _id: { type: String },
   name: { type: String, required: true },
+  referencePrefix: { type: String, enum: ["EXT", "INV"] },
   from: { type: String, required: true },
   to: { type: String, required: true },
   fingerprint: { type: String, required: true },

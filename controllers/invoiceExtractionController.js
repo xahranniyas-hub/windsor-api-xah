@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import mongoose from "mongoose";
 import Booking from "../models/bookingModel.js";
 import InvoiceExtraction, { ExtractionSequence } from "../models/invoiceExtractionModel.js";
-import { dateRange, makeEntries, MAX_EXTRACTION_SIZE } from "../utils/invoiceExtraction.js";
+import { dateRange, makeEntries, MAX_EXTRACTION_SIZE, EXTRACTION_START, EXTRACTION_SEQUENCE_ID } from "../utils/invoiceExtraction.js";
 
 const fail = (status, message) => Object.assign(new Error(message), { status });
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -44,7 +44,7 @@ export async function createExtraction(req, res) {
     // Initialise outside the transaction; _id guarantees exactly one sequence document.
     await Promise.all([InvoiceExtraction.init(), ExtractionSequence.init()]);
     try {
-      await ExtractionSequence.updateOne({ _id: "handover" }, { $setOnInsert: { seq: 0 } }, { upsert: true });
+      await ExtractionSequence.updateOne({ _id: EXTRACTION_SEQUENCE_ID }, { $setOnInsert: { seq: EXTRACTION_START - 1 } }, { upsert: true });
     } catch (error) { if (error.code !== 11000) throw error; }
     const batch = await mongoose.connection.transaction(async (session) => {
       const bookings = await Booking.find({
@@ -56,10 +56,10 @@ export async function createExtraction(req, res) {
       if (bookings.some((b) => !Number.isFinite(b.finalInvoice.total))) throw fail(409, "An invoice has an invalid total. Correct it before extracting.");
       const entries = makeEntries(bookings, 1);
       if (Buffer.byteLength(JSON.stringify(entries)) > 10 * 1024 * 1024) throw fail(400, "This batch is too large. Select fewer invoices.");
-      const counter = await ExtractionSequence.findByIdAndUpdate("handover", { $inc: { seq: bookings.length } }, { new: true, session });
+      const counter = await ExtractionSequence.findByIdAndUpdate(EXTRACTION_SEQUENCE_ID, { $inc: { seq: bookings.length } }, { new: true, session });
       const firstNumber = counter.seq - bookings.length + 1;
       const [saved] = await InvoiceExtraction.create([{
-        _id: requestId, name, from, to, fingerprint, createdBy: req.user._id,
+        _id: requestId, name, from, to, fingerprint, referencePrefix: "INV", createdBy: req.user._id,
         firstNumber, lastNumber: counter.seq, count: bookings.length,
         total: bookings.reduce((sum, b) => sum + b.finalInvoice.total, 0),
         entries: makeEntries(bookings, firstNumber),
